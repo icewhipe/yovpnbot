@@ -249,6 +249,9 @@ def start_command(message):
     """Обработчик команды /start: приветствие, бонус, рефералка, начало настройки."""
     user_id = message.from_user.id
     first_name = message.from_user.first_name or "Пользователь"
+    # Требуем username
+    if not ensure_username_or_prompt(message):
+        return
     username = _sanitize_username(message.from_user.username, first_name)
     
     logger.info(f"Команда /start: ID={user_id}, Username=@{username}, FirstName={first_name}")
@@ -337,18 +340,24 @@ def handle_callback(call):
     elif call.data == "channel_link":
         show_channel_link(fake_message)
     elif call.data == 'start_setup':
-        show_setup_step1(fake_message)
+        if ensure_username_or_prompt(fake_message):
+            show_setup_step1(fake_message)
     elif call.data.startswith('choose_device_'):
-        device_key = call.data.replace('choose_device_', '')
-        show_setup_step2(fake_message, device_key)
+        if ensure_username_or_prompt(fake_message):
+            device_key = call.data.replace('choose_device_', '')
+            show_setup_step2(fake_message, device_key)
     elif call.data == 'continue_setup':
-        continue_setup_flow(fake_message)
+        if ensure_username_or_prompt(fake_message):
+            continue_setup_flow(fake_message)
     elif call.data == 'back_to_setup_1':
-        show_setup_step1(fake_message)
+        if ensure_username_or_prompt(fake_message):
+            show_setup_step1(fake_message)
     elif call.data == 'finish_setup':
-        finish_setup(fake_message)
+        if ensure_username_or_prompt(fake_message):
+            finish_setup(fake_message)
     elif call.data == 'show_qr_key':
-        show_qr_key(fake_message)
+        if ensure_username_or_prompt(fake_message):
+            show_qr_key(fake_message)
     elif call.data.startswith("get_link_"):
         username = call.data.replace("get_link_", "")
         show_vpn_links(fake_message, username)
@@ -382,6 +391,12 @@ def show_main_menu(message):
     
     logger.info(f"Главное меню: ID={user_id}, Username=@{username}, FirstName={first_name}")
     
+    # Синхронизируем срок действия с балансом (каждые 4 ₽ = 1 день)
+    user_rec = ensure_user_record(user_id, username, first_name)
+    try:
+        marzban_api.apply_balance_as_days(username, int(user_rec.get('balance_rub', 0)))
+    except Exception:
+        pass
     # Проверяем, есть ли у пользователя подписка
     user_info = marzban_api.get_user_info(username) if username else None
     is_new_user = user_id not in test_users
@@ -1379,14 +1394,13 @@ def show_about_service(message):
 • Поддержка всех устройств
 
 {EMOJI['device']} <b>Поддерживаемые платформы:</b>
-• Windows, macOS, Linux
-• iOS, Android
-• Router, Smart TV
+• Windows, macOS
+• iOS, Android, AndroidTV
 
-{EMOJI['security']} <b>Протоколы:</b>
-• V2Ray, Clash, Sing-box
-• Outline, Shadowsocks
-• WireGuard, OpenVPN
+{EMOJI['security']} <b>Протокол:</b>
+• VLESS (Reality) — современный протокол, устойчивый к блокировкам и DPI.
+  Шифрование и маскировка трафика обеспечивают стабильный доступ даже в сложных сетях.
+  Приложения: v2raytun (iOS/macOS), Hiddify (Android/Windows/AndroidTV).
 
 {EMOJI['support']} <b>Техподдержка:</b> @icewhipe
 {EMOJI['channel']} <b>Канал:</b> @yodevelop

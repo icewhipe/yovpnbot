@@ -162,6 +162,44 @@ class MarzbanAPI:
             "links": links,
             "user_data": user_data
         }
+
+    # ===== Баланс → дни → продление подписки =====
+    def extend_user_by_days(self, username: str, add_days: int) -> bool:
+        """Продлевает срок действия пользователя на add_days от текущей даты (или от текущего expire)."""
+        try:
+            user = self.get_user_by_username(username)
+            if not user:
+                return False
+            now = datetime.now()
+            expire = user.get('expire')
+            if isinstance(expire, str):
+                base = datetime.fromisoformat(expire.replace('Z', '+00:00'))
+            elif expire:
+                base = datetime.fromtimestamp(expire)
+            else:
+                base = now
+            if base < now:
+                base = now
+            new_expire = base + timedelta(days=add_days)
+            payload = {"expire": int(new_expire.timestamp())}
+            resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+            if resp.status_code in (200, 204):
+                logger.info(f"Продлен пользователь {username} на {add_days} дней (до {new_expire})")
+                return True
+            logger.warning(f"Не удалось продлить {username}: {resp.status_code} {resp.text}")
+            return False
+        except Exception as e:
+            logger.error(f"extend_user_by_days error: {e}")
+            return False
+
+    def apply_balance_as_days(self, username: str, balance_rub: int) -> bool:
+        """Пересчитывает баланс (4 ₽ = 1 день) и обновляет expire на сумму дней. Обнуляет баланс у нас не будем.
+        Эта функция продлевает ровно на days_from_balance, не списывая баланс. Вызовите отдельно списание, если нужно.
+        """
+        days = max(0, balance_rub // 4)
+        if days <= 0:
+            return True
+        return self.extend_user_by_days(username, days)
     
     def create_test_user(self, username: str, telegram_id: int) -> Optional[Dict]:
         """Создать пользователя с тестовым периодом на 7 дней"""
