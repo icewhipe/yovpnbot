@@ -4,6 +4,8 @@ API для работы с Marzban
 """
 
 import requests
+import os
+from urllib.parse import quote
 import json
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
@@ -146,8 +148,41 @@ class MarzbanAPI:
             return None
         
         # Извлекаем ссылки из user_data
-        links = user_data.get('links', [])
+        links = user_data.get('links', []) or []
         subscription_url = user_data.get('subscription_url', '')
+
+        # Fallback: если панель не выдает ссылки, пробуем собрать VLESS Reality вручную из env
+        try:
+            if not links and user_data.get('proxies', {}).get('vless', {}).get('id'):
+                uuid = user_data['proxies']['vless']['id']
+                host = os.environ.get('VLESS_HOST') or os.environ.get('SERVER_HOST') or os.environ.get('DOMAIN')
+                port = os.environ.get('VLESS_PORT') or os.environ.get('PORT') or '443'
+                pbk = os.environ.get('REALITY_PBK')
+                sni = os.environ.get('REALITY_SNI') or host
+                short_id = os.environ.get('REALITY_SHORT_ID') or os.environ.get('REALITY_SID')
+                fp = os.environ.get('VLESS_FP', 'chrome')
+                alpn = os.environ.get('VLESS_ALPN', 'h2')
+                label = os.environ.get('VLESS_LABEL', 'YoVPN')
+                if host and pbk:
+                    query = [
+                        'type=tcp',
+                        'security=reality',
+                        f'pbk={pbk}',
+                        'flow=xtls-rprx-vision'
+                    ]
+                    if sni:
+                        query.append(f'sni={sni}')
+                    if fp:
+                        query.append(f'fp={fp}')
+                    if alpn:
+                        query.append(f'alpn={alpn}')
+                    if short_id:
+                        query.append(f'sid={short_id}')
+                    q = '&'.join(query)
+                    link = f"vless://{uuid}@{host}:{port}?{q}#{quote(label)}"
+                    links = [link]
+        except Exception:
+            pass
         
         status = self.get_user_status(user_data)
         days_remaining = self.get_days_remaining(user_data)
