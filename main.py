@@ -99,6 +99,24 @@ def ensure_user_record(user_id, username, first_name):
             _save_data(DATA)
         return record
 
+def ensure_username_or_prompt(message) -> bool:
+    """Проверяет наличие Telegram username. Если нет — показывает инструкцию и возвращает False."""
+    if getattr(message.from_user, 'username', None):
+        return True
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton("Проверить снова", callback_data='retry_start'))
+    text = (
+        f"{EMOJI['warning']} <b>Требуется Username</b>\n\n"
+        f"Чтобы бот работал корректно, установите Username (ник) в Telegram.\n"
+        f"Откройте: Настройки → Изменить профиль → Имя пользователя.\n\n"
+        f"После установки нажмите «Проверить снова» или отправьте /start."
+    )
+    try:
+        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=keyboard)
+    except Exception:
+        pass
+    return False
+
 def get_user_record(user_id):
     with DATA_LOCK:
         return DATA.get("users", {}).get(str(user_id))
