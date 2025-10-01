@@ -150,6 +150,11 @@ class MarzbanAPI:
         # Извлекаем ссылки из user_data
         links = user_data.get('links', []) or []
         subscription_url = user_data.get('subscription_url', '')
+        if not subscription_url:
+            # Доп. фолбэк: шаблон из переменной окружения, например: https://panel.example.com/sub/{username}
+            tmpl = os.environ.get('SUBSCRIPTION_FALLBACK_TEMPLATE')
+            if tmpl and '{username}' in tmpl:
+                subscription_url = tmpl.replace('{username}', username.lstrip('@'))
 
         # Fallback: если панель не выдает ссылки, пробуем собрать VLESS Reality вручную из env
         try:

@@ -977,8 +977,7 @@ def show_vpn_links(message, username):
         links = user_info['links']
         subscription_url = user_info['subscription_url']
         
-        # Добавляем кнопки для разных типов ссылок
-        keyboard.add(types.InlineKeyboardButton(f"{EMOJI['link']} VLESS ссылки", callback_data=f"show_vless_{username}"))
+        # В балансной модели показываем только подписку
         keyboard.add(types.InlineKeyboardButton(f"{EMOJI['subscription']} Подписка", callback_data=f"show_sub_{username}"))
         keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="my_subscriptions"))
         
@@ -986,12 +985,10 @@ def show_vpn_links(message, username):
 {EMOJI['link']} <b>Ссылки для установки VPN</b>
 
 {EMOJI['rocket']} <b>Доступно:</b>
-• VLESS ссылки: {len(links)} серверов
 • Подписка: Готова к установке
 
-{EMOJI['info']} <b>Выберите тип ссылки:</b>
-• VLESS — для отдельных серверов
-• Подписка — для автообновления
+{EMOJI['info']} <b>О подписке:</b>
+• Одна ссылка на наш домен, внутри клиент сам обновляет список узлов
 
 {EMOJI['device']} <b>Рекомендуемые приложения:</b>
 • iOS/macOS: v2raytun
