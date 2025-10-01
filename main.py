@@ -204,20 +204,7 @@ def start_command(message):
     """Обработчик команды /start: приветствие, бонус, рефералка, начало настройки."""
     user_id = message.from_user.id
     first_name = message.from_user.first_name or "Пользователь"
-    raw_username = message.from_user.username
-    # Если у пользователя нет username — просим установить и прерываем сценарий
-    if not raw_username:
-        keyboard = types.InlineKeyboardMarkup(row_width=1)
-        keyboard.add(types.InlineKeyboardButton("Проверить снова", callback_data='retry_start'))
-        text = (
-            f"{EMOJI['warning']} <b>Требуется Username</b>\n\n"
-            f"Чтобы бот работал корректно, установите Username (ник) в Telegram.\n"
-            f"Откройте: Настройки → Изменить профиль → Имя пользователя.\n\n"
-            f"После установки нажмите «Проверить снова» или отправьте /start."
-        )
-        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=keyboard)
-        return
-    username = _sanitize_username(raw_username, first_name)
+    username = _sanitize_username(message.from_user.username, first_name)
     
     logger.info(f"Команда /start: ID={user_id}, Username=@{username}, FirstName={first_name}")
     
@@ -320,8 +307,6 @@ def handle_callback(call):
         finish_setup(fake_message)
     elif call.data == 'show_qr_key':
         show_qr_key(fake_message)
-    elif call.data == 'retry_start':
-        start_command(fake_message)
     elif call.data.startswith("get_link_"):
         username = call.data.replace("get_link_", "")
         show_vpn_links(fake_message, username)
