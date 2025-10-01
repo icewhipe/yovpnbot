@@ -10,6 +10,7 @@ import time
 import json
 import threading
 from io import BytesIO
+from urllib.parse import quote
 from decouple import config
 import telebot
 from telebot import types
@@ -840,7 +841,16 @@ def show_qr_key(message):
             bot.send_photo(message.chat.id, photo=bio, caption=f"{EMOJI['qr']} QR-код вашей подписки", reply_markup=kb)
             return
         except Exception as e:
-            logger.warning(f"Не удалось сгенерировать QR: {e}")
+            logger.warning(f"Не удалось сгенерировать QR локально: {e}")
+
+    # Fallback: отдать QR как URL-сервис
+    try:
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=512x512&data={quote(sub_url)}"
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data='finish_setup'))
+        bot.send_photo(message.chat.id, photo=qr_url, caption=f"{EMOJI['qr']} QR-код вашей подписки", reply_markup=kb)
+        return
+    except Exception as e:
+        logger.warning(f"Не удалось отправить QR через сервис: {e}")
 
     bot.send_message(message.chat.id, f"{EMOJI['qr']} Ваша подписка:\n<code>{sub_url}</code>", parse_mode='HTML')
 
