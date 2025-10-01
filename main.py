@@ -795,24 +795,18 @@ def continue_setup_flow(message):
     )
 
     text_lines = [
-        f"{EMOJI['check']} <b>Шаг 3.</b> Ключ активирован!",
+        f"{EMOJI['check']} <b>Шаг 3.</b> Подписка готова!",
         "",
-        "Скопируйте и вставьте ключ в приложение:",
     ]
-    if vless_link:
-        text_lines.append(f"<code>{vless_link}</code>")
-    else:
-        text_lines.append(f"{EMOJI['cross']} Не удалось получить ключ. Попробуйте позже.")
     if sub_url:
         text_lines.extend([
-            "",
-            f"{EMOJI['subscription']} <b>Ссылка-подписка:</b>",
+            f"{EMOJI['subscription']} <b>Ваша подписка:</b>",
             f"<code>{sub_url}</code>",
+            "",
+            f"{EMOJI['info']} Импортируйте ссылку в приложение. Клиент сам обновляет узлы.",
         ])
-    text_lines.extend([
-        "",
-        f"{EMOJI['info']} <b>Шаг 4.</b> Откройте выбранное приложение и вставьте ключ.",
-    ])
+    else:
+        text_lines.append(f"{EMOJI['cross']} Не удалось получить ссылку-подписку. Попробуйте позже или обратитесь в поддержку.")
 
     final_text = "\n".join(text_lines)
     try:
@@ -821,36 +815,34 @@ def continue_setup_flow(message):
         bot.send_message(message.chat.id, final_text, parse_mode='HTML', reply_markup=keyboard)
 
 def show_qr_key(message):
-    """Показать QR-код для VLESS ключа"""
+    """Показать QR-код для ссылки-подписки"""
     first_name = message.from_user.first_name or "Пользователь"
     username = message.from_user.username or first_name.lower().replace(" ", "_")
     user_info = marzban_api.get_user_info(username)
-    vless_link = None
+    sub_url = None
     if user_info and isinstance(user_info, dict):
-        links = user_info.get('links') or []
-        if links:
-            vless_link = links[0]
-    if not vless_link:
+        sub_url = user_info.get('subscription_url')
+    if not sub_url:
         rec = get_user_record(message.from_user.id)
-        vless_link = rec.get('vless_link') if rec else None
+        sub_url = rec.get('subscription_url') if rec else None
 
-    if not vless_link:
-        bot.send_message(message.chat.id, f"{EMOJI['cross']} Ключ не найден. Попробуйте заново.")
+    if not sub_url:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Подписка не найдена. Попробуйте заново.")
         return
 
     if QR_AVAILABLE:
         try:
-            img = qrcode.make(vless_link)
+            img = qrcode.make(sub_url)
             bio = BytesIO()
             img.save(bio, format='PNG')
             bio.seek(0)
             kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data='finish_setup'))
-            bot.send_photo(message.chat.id, photo=bio, caption=f"{EMOJI['qr']} QR-код вашего ключа", reply_markup=kb)
+            bot.send_photo(message.chat.id, photo=bio, caption=f"{EMOJI['qr']} QR-код вашей подписки", reply_markup=kb)
             return
         except Exception as e:
             logger.warning(f"Не удалось сгенерировать QR: {e}")
 
-    bot.send_message(message.chat.id, f"{EMOJI['qr']} Ваш ключ:\n<code>{vless_link}</code>", parse_mode='HTML')
+    bot.send_message(message.chat.id, f"{EMOJI['qr']} Ваша подписка:\n<code>{sub_url}</code>", parse_mode='HTML')
 
 def finish_setup(message):
     """Завершение настройки: конфетти и главное меню"""
