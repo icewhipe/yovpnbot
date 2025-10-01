@@ -7,10 +7,20 @@ import os
 import sys
 import logging
 import time
+import json
+import threading
+from io import BytesIO
 from decouple import config
 import telebot
 from telebot import types
 from marzban_api import MarzbanAPI
+
+# Опциональная поддержка генерации QR-кодов
+try:
+    import qrcode
+    QR_AVAILABLE = True
+except Exception:
+    QR_AVAILABLE = False
 
 # Настройка логирования
 logging.basicConfig(
@@ -34,6 +44,116 @@ bot = telebot.TeleBot(BOT_TOKEN)
 
 # Инициализация Marzban API с токеном
 marzban_api = MarzbanAPI(MARZBAN_API_URL, MARZBAN_ADMIN_TOKEN)
+
+# Простое хранилище данных (JSON) для баланса/рефералок/настроек
+DATA_FILE = '/workspace/data.json'
+DATA_LOCK = threading.Lock()
+
+def _load_data():
+    if not os.path.exists(DATA_FILE):
+        return {"users": {}}
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {"users": {}}
+
+def _save_data(data):
+    try:
+        with open(DATA_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Не удалось сохранить данные: {e}")
+
+DATA = _load_data()
+
+def _sanitize_username(username, fallback_name):
+    if username:
+        return username
+    return (fallback_name or "user").lower().replace(" ", "_")
+
+def ensure_user_record(user_id, username, first_name):
+    """Гарантированно создает запись пользователя в локальном хранилище."""
+    global DATA
+    with DATA_LOCK:
+        data_users = DATA.setdefault("users", {})
+        record = data_users.get(str(user_id))
+        if not record:
+            record = {
+                "user_id": user_id,
+                "username": _sanitize_username(username, first_name),
+                "balance_rub": 0,
+                "bonus_given": False,
+                "first_start_completed": False,
+                "referred_by": None,
+                "referrals": [],
+                "device": None,
+                "app_link": None,
+                "vless_link": None,
+                "subscription_url": None
+            }
+            data_users[str(user_id)] = record
+            _save_data(DATA)
+        return record
+
+def get_user_record(user_id):
+    with DATA_LOCK:
+        return DATA.get("users", {}).get(str(user_id))
+
+def update_user_record(user_id, updates: dict):
+    global DATA
+    with DATA_LOCK:
+        if str(user_id) not in DATA.get("users", {}):
+            return
+        DATA["users"][str(user_id)].update(updates)
+        _save_data(DATA)
+
+def credit_balance(user_id, amount_rub, reason: str = ""):
+    global DATA
+    with DATA_LOCK:
+        rec = DATA.get("users", {}).get(str(user_id))
+        if not rec:
+            return
+        rec["balance_rub"] = max(0, int(rec.get("balance_rub", 0)) + int(amount_rub))
+        _save_data(DATA)
+    logger.info(f"Зачисление {amount_rub} ₽ пользователю {user_id}. Причина: {reason}")
+
+def days_from_balance(balance_rub: int) -> int:
+    try:
+        return int(balance_rub) // 4
+    except Exception:
+        return 0
+
+def find_user_id_by_username(username: str):
+    with DATA_LOCK:
+        for uid, rec in DATA.get("users", {}).items():
+            if rec.get("username") == username:
+                return int(uid)
+    return None
+
+def record_referral(referrer_user_id: int, referred_user_id: int):
+    global DATA
+    if referrer_user_id == referred_user_id:
+        return False
+    with DATA_LOCK:
+        referrer = DATA.get("users", {}).get(str(referrer_user_id))
+        referred = DATA.get("users", {}).get(str(referred_user_id))
+        if not referrer or not referred:
+            return False
+        if referred.get("referred_by"):
+            return False
+        # Записываем связь и избегаем дублей
+        referred["referred_by"] = referrer_user_id
+        if str(referred_user_id) not in [str(x) for x in referrer.get("referrals", [])]:
+            ref_list = referrer.get("referrals", [])
+            ref_list.append(referred_user_id)
+            referrer["referrals"] = ref_list
+        # Начисляем 12 ₽ (10 ₽ + 2 ₽ бонус для 3-го дня)
+        ref_bonus = 12
+        referrer["balance_rub"] = max(0, int(referrer.get("balance_rub", 0)) + ref_bonus)
+        _save_data(DATA)
+        logger.info(f"Реферал: {referrer_user_id} получил {ref_bonus} ₽ за {referred_user_id}")
+        return True
 
 # Список пользователей, которые уже получили тестовый период
 test_users = set()
@@ -81,108 +201,53 @@ EMOJI = {
 
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    """Обработчик команды /start"""
+    """Обработчик команды /start: приветствие, бонус, рефералка, начало настройки."""
     user_id = message.from_user.id
-    username = message.from_user.username
     first_name = message.from_user.first_name or "Пользователь"
-    
-    # Если username None, используем first_name
-    if not username:
-        username = first_name.lower().replace(" ", "_")
+    username = _sanitize_username(message.from_user.username, first_name)
     
     logger.info(f"Команда /start: ID={user_id}, Username=@{username}, FirstName={first_name}")
     
-    # Проверяем, есть ли у пользователя подписка
-    user_info = marzban_api.get_user_info(username) if username else None
-    is_new_user = user_id not in test_users
+    record = ensure_user_record(user_id, username, first_name)
     
-    # Создаем клавиатуру главного меню
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    # Обрабатываем реферальный параметр: /start ref_<id|username>
+    try:
+        param = None
+        if message.text and ' ' in message.text:
+            param = message.text.split(' ', 1)[1].strip()
+        if param and param.startswith('ref_'):
+            ref_key = param.replace('ref_', '', 1)
+            referrer_id = int(ref_key) if ref_key.isdigit() else find_user_id_by_username(ref_key)
+            if referrer_id:
+                record_referral(referrer_id, user_id)
+    except Exception as e:
+        logger.warning(f"Не удалось обработать реферальный параметр: {e}")
     
-    if user_info:
-        # Пользователь с подпиской
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['add']} Продлить подписку", callback_data="add_subscription"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
+    # Приветственный бонус 20 ₽ (однократно)
+    if not record.get('bonus_given'):
+        credit_balance(user_id, 20, reason='welcome_bonus')
+        update_user_record(user_id, {"bonus_given": True})
+    
+    # Если это самый первый /start — показываем приветствие с кнопкой настройки
+    if not record.get('first_start_completed'):
+        keyboard = types.InlineKeyboardMarkup(row_width=1)
+        keyboard.add(types.InlineKeyboardButton(f"{EMOJI['settings']} Настроить VPN", callback_data='start_setup'))
+        welcome_text = (
+            f"{EMOJI['user']} <b>Добро пожаловать, {first_name}!</b>\n\n"
+            f"Вы попали в бота <b>YoVPN</b>. Мы начислили вам <b>20 ₽</b> — это <b>5 дней</b> доступа (4 ₽ = 1 день).\n\n"
+            f"<b>Почему YoVPN:</b>\n"
+            f"• {EMOJI['speed']} Высокая скорость\n"
+            f"• {EMOJI['security']} Надежная защита\n"
+            f"• {EMOJI['no_logs']} Без логов\n"
+            f"• {EMOJI['active']} Стабильно 24/7\n\n"
+            f"Нажмите «Настроить VPN», чтобы начать."
         )
-    elif is_new_user:
-        # Новый пользователь
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['gift']} Получить тестовый период", callback_data=f"get_test_{username}"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
-    else:
-        # Пользователь уже получал тест
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['add']} Купить подписку", callback_data="add_subscription"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
+        bot.send_message(message.chat.id, welcome_text, parse_mode='HTML', reply_markup=keyboard)
+        update_user_record(user_id, {"first_start_completed": True})
+        return
     
-    # Вторая строка: Баланс (длинная кнопка)
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['balance']} Баланс", callback_data="balance")
-    )
-    
-    # Третья строка: Пригласить друга и Мои рефералы
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['referral']} Пригласить друга", callback_data="invite_friend"),
-        types.InlineKeyboardButton(f"{EMOJI['referral']} Мои рефералы", callback_data="my_referrals")
-    )
-    
-    # Четвертая строка: О сервисе (длинная кнопка)
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['info']} О сервисе", callback_data="about_service")
-    )
-    
-    if user_info:
-        # Пользователь с подпиской
-        welcome_text = f"""
-{EMOJI['user']} <b>Добро пожаловать, {first_name}!</b>
-
-<b>Ваш профиль:</b>
-├ ID: {user_id}
-├ Username: @{username}
-├ Баланс: 0 RUB
-└ Подписок: 1
-
-{EMOJI['rocket']} <b>Выберите действие:</b>
-"""
-    elif is_new_user:
-        # Новый пользователь
-        welcome_text = f"""
-{EMOJI['user']} <b>Добро пожаловать, {first_name}!</b>
-
-{EMOJI['gift']} <b>Подарок для новых пользователей!</b>
-Вы получили 7 дней бесплатного доступа к VPN
-
-<b>Ваш профиль:</b>
-├ ID: {user_id}
-├ Username: @{username}
-├ Баланс: 0 RUB
-└ Подписок: 0
-
-{EMOJI['rocket']} <b>Выберите действие:</b>
-"""
-    else:
-        # Пользователь уже получал тест
-        welcome_text = f"""
-{EMOJI['user']} <b>Добро пожаловать, {first_name}!</b>
-
-<b>Ваш профиль:</b>
-├ ID: {user_id}
-├ Username: @{username}
-├ Баланс: 0 RUB
-└ Подписок: 0
-
-{EMOJI['rocket']} <b>Выберите действие:</b>
-"""
-    
-    bot.send_message(
-        message.chat.id,
-        welcome_text,
-        parse_mode='HTML',
-        reply_markup=keyboard
-    )
+    # Иначе показываем главное меню
+    show_main_menu(message)
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
@@ -229,6 +294,19 @@ def handle_callback(call):
         show_support_chat(fake_message)
     elif call.data == "channel_link":
         show_channel_link(fake_message)
+    elif call.data == 'start_setup':
+        show_setup_step1(fake_message)
+    elif call.data.startswith('choose_device_'):
+        device_key = call.data.replace('choose_device_', '')
+        show_setup_step2(fake_message, device_key)
+    elif call.data == 'continue_setup':
+        continue_setup_flow(fake_message)
+    elif call.data == 'back_to_setup_1':
+        show_setup_step1(fake_message)
+    elif call.data == 'finish_setup':
+        finish_setup(fake_message)
+    elif call.data == 'show_qr_key':
+        show_qr_key(fake_message)
     elif call.data.startswith("get_link_"):
         username = call.data.replace("get_link_", "")
         show_vpn_links(fake_message, username)
@@ -564,21 +642,210 @@ def get_test_period(message, username):
             reply_markup=keyboard
         )
 
+def show_setup_step1(message):
+    """Шаг 1: Выбор устройства"""
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("iOS", callback_data='choose_device_ios'),
+        types.InlineKeyboardButton("Android", callback_data='choose_device_android')
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("Windows", callback_data='choose_device_windows'),
+        types.InlineKeyboardButton("macOS", callback_data='choose_device_macos')
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("AndroidTV", callback_data='choose_device_androidtv')
+    )
+    keyboard.add(
+        types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data='back_to_main')
+    )
+
+    text = (
+        f"{EMOJI['settings']} <b>Шаг 1.</b> Выберите тип устройства\n\n"
+        f"Доступные варианты: iOS, Android, Windows, macOS, AndroidTV"
+    )
+
+    try:
+        bot.edit_message_text(
+            text,
+            message.chat.id,
+            message.message_id,
+            parse_mode='HTML',
+            reply_markup=keyboard
+        )
+    except Exception:
+        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=keyboard)
+
+DEVICE_APP_LINKS = {
+    "ios": "https://apps.apple.com/ru/app/v2raytun/id6476628951?l=en-GB",
+    "android": "https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru",
+    "windows": "https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Windows-Setup-x64.Msix",
+    "macos": "https://apps.apple.com/ru/app/v2raytun/id6476628951?l=en-GB",
+    "androidtv": "https://play.google.com/store/apps/details?id=app.hiddify.com&hl=ru"
+}
+
+def _device_human_name(key: str) -> str:
+    mapping = {
+        "ios": "iOS",
+        "android": "Android",
+        "windows": "Windows",
+        "macos": "macOS",
+        "androidtv": "AndroidTV"
+    }
+    return mapping.get(key, key)
+
+def show_setup_step2(message, device_key: str):
+    """Шаг 2: Установка приложения для выбранного устройства"""
+    device_key = device_key.lower()
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name or "Пользователь"
+    username = message.from_user.username or first_name.lower().replace(" ", "_")
+
+    ensure_user_record(user_id, username, first_name)
+
+    app_link = DEVICE_APP_LINKS.get(device_key)
+    update_user_record(user_id, {"device": device_key, "app_link": app_link})
+
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    if app_link:
+        keyboard.add(types.InlineKeyboardButton(f"Скачать для {_device_human_name(device_key)}", url=app_link))
+    keyboard.add(
+        types.InlineKeyboardButton("Продолжить настройку VPN", callback_data='continue_setup'),
+        types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data='back_to_setup_1')
+    )
+
+    text = (
+        f"{EMOJI['settings']} <b>Шаг 2.</b> Установите приложение для {_device_human_name(device_key)}\n\n"
+        f"После установки нажмите «Продолжить настройку VPN»."
+    )
+
+    try:
+        bot.edit_message_text(
+            text,
+            message.chat.id,
+            message.message_id,
+            parse_mode='HTML',
+            reply_markup=keyboard
+        )
+    except Exception:
+        bot.send_message(message.chat.id, text, parse_mode='HTML', reply_markup=keyboard)
+
+def continue_setup_flow(message):
+    """Шаг 3: Анимация и генерация VLESS-конфига (Marzban)"""
+    first_name = message.from_user.first_name or "Пользователь"
+    username = message.from_user.username or first_name.lower().replace(" ", "_")
+
+    stages = [
+        (f"{EMOJI['hourglass']} <b>Готовим инфраструктуру...</b>\n\n{EMOJI['loading']} Подключаемся к серверам", 2),
+        (f"{EMOJI['hourglass']} <b>Настраиваем протокол...</b>\n\n{EMOJI['loading']} Активируем VLESS Reality", 3),
+        (f"{EMOJI['hourglass']} <b>Создаем ваш ключ...</b>\n\n{EMOJI['loading']} Генерируем доступ", 3)
+    ]
+    for text, delay in stages:
+        try:
+            bot.edit_message_text(text, message.chat.id, message.message_id, parse_mode='HTML')
+        except Exception:
+            msg = bot.send_message(message.chat.id, text, parse_mode='HTML')
+            message = msg
+        time.sleep(delay)
+
+    user_info = marzban_api.get_user_info(username)
+    if not user_info:
+        try:
+            marzban_api.create_test_user(username, message.from_user.id)
+            user_info = marzban_api.get_user_info(username)
+        except Exception as e:
+            logger.error(f"Не удалось создать пользователя в Marzban: {e}")
+
+    vless_link = None
+    sub_url = None
+    if user_info and isinstance(user_info, dict):
+        links = user_info.get('links') or []
+        if links:
+            vless_link = links[0]
+        sub_url = user_info.get('subscription_url')
+
+    update_user_record(message.from_user.id, {"vless_link": vless_link, "subscription_url": sub_url})
+
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        types.InlineKeyboardButton("Завершить настройку", callback_data='finish_setup'),
+        types.InlineKeyboardButton("Показать в виде QR-кода", callback_data='show_qr_key')
+    )
+
+    text_lines = [
+        f"{EMOJI['check']} <b>Шаг 3.</b> Ключ активирован!",
+        "",
+        "Скопируйте и вставьте ключ в приложение:",
+    ]
+    if vless_link:
+        text_lines.append(f"<code>{vless_link}</code>")
+    else:
+        text_lines.append(f"{EMOJI['cross']} Не удалось получить ключ. Попробуйте позже.")
+    text_lines.extend([
+        "",
+        f"{EMOJI['info']} <b>Шаг 4.</b> Откройте выбранное приложение и вставьте ключ.",
+    ])
+
+    final_text = "\n".join(text_lines)
+    try:
+        bot.edit_message_text(final_text, message.chat.id, message.message_id, parse_mode='HTML', reply_markup=keyboard)
+    except Exception:
+        bot.send_message(message.chat.id, final_text, parse_mode='HTML', reply_markup=keyboard)
+
+def show_qr_key(message):
+    """Показать QR-код для VLESS ключа"""
+    first_name = message.from_user.first_name or "Пользователь"
+    username = message.from_user.username or first_name.lower().replace(" ", "_")
+    user_info = marzban_api.get_user_info(username)
+    vless_link = None
+    if user_info and isinstance(user_info, dict):
+        links = user_info.get('links') or []
+        if links:
+            vless_link = links[0]
+    if not vless_link:
+        rec = get_user_record(message.from_user.id)
+        vless_link = rec.get('vless_link') if rec else None
+
+    if not vless_link:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Ключ не найден. Попробуйте заново.")
+        return
+
+    if QR_AVAILABLE:
+        try:
+            img = qrcode.make(vless_link)
+            bio = BytesIO()
+            img.save(bio, format='PNG')
+            bio.seek(0)
+            kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data='finish_setup'))
+            bot.send_photo(message.chat.id, photo=bio, caption=f"{EMOJI['qr']} QR-код вашего ключа", reply_markup=kb)
+            return
+        except Exception as e:
+            logger.warning(f"Не удалось сгенерировать QR: {e}")
+
+    bot.send_message(message.chat.id, f"{EMOJI['qr']} Ваш ключ:\n<code>{vless_link}</code>", parse_mode='HTML')
+
+def finish_setup(message):
+    """Завершение настройки: конфетти и главное меню"""
+    try:
+        bot.edit_message_text("🎉 Настройка завершена!", message.chat.id, message.message_id)
+    except Exception:
+        bot.send_message(message.chat.id, "🎉 Настройка завершена!")
+    show_main_menu(message)
+
 def show_my_subscriptions(message):
     """Показать мои подписки"""
     keyboard = types.InlineKeyboardMarkup()
     
     # Получаем username из сообщения
     username = message.from_user.username
+    if not username:
+        username = (message.from_user.first_name or "Пользователь").lower().replace(" ", "_")
     user_id = message.from_user.id
     first_name = message.from_user.first_name or "Пользователь"
     
     logger.info(f"Пользователь: ID={user_id}, Username=@{username}, FirstName={first_name}")
     
-    # Если username None, используем first_name
-    if not username:
-        username = first_name.lower().replace(" ", "_")
-        logger.info(f"Username пустой, используем: {username}")
+    # Username нормализован
     
     logger.info(f"Ищем пользователя в Marzban: {username}")
     
@@ -586,51 +853,15 @@ def show_my_subscriptions(message):
     user_info = marzban_api.get_user_info(username)
     
     if not user_info:
-        # Проверяем, новый ли это пользователь
-        is_new_user = user_id not in test_users
-        
-        if is_new_user:
-            # Новый пользователь - показываем кнопку тестового периода
-            keyboard.add(
-                types.InlineKeyboardButton(f"{EMOJI['gift']} Получить тестовый период", callback_data=f"get_test_{username}"),
-                types.InlineKeyboardButton(f"{EMOJI['add']} Купить подписку", callback_data="add_subscription")
-            )
-            
-            text = f"""
+        # Нет данных о подписке — предлагаем начать настройку
+        keyboard.add(
+            types.InlineKeyboardButton(f"{EMOJI['settings']} Настроить VPN", callback_data='start_setup'),
+            types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data='back_to_main')
+        )
+        text = f"""
 {EMOJI['subscription']} <b>Мои подписки</b>
 
-{EMOJI['gift']} <b>Добро пожаловать!</b>
-
-{EMOJI['rocket']} <b>Получите 7 дней бесплатного доступа к VPN:</b>
-• Свободный интернет без ограничений
-• Высокая скорость соединения
-• Военная защита данных
-• Подключение до 3 устройств
-• Полная анонимность - никаких логов
-
-{EMOJI['gift']} <b>Нажмите "Получить тестовый период" и начните пользоваться VPN прямо сейчас!</b>
-"""
-        else:
-            # Пользователь уже получал тест - показываем кнопку покупки
-            keyboard.add(
-                types.InlineKeyboardButton(f"{EMOJI['add']} Купить подписку", callback_data="add_subscription"),
-                types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main")
-            )
-            
-            text = f"""
-{EMOJI['subscription']} <b>Мои подписки</b>
-
-{EMOJI['cross']} <b>У вас пока нет активной подписки</b>
-
-{EMOJI['rocket']} <b>Получите доступ к VPN:</b>
-• Свободный интернет без ограничений
-• Высокая скорость соединения
-• Военная защита данных
-• Подключение до 3 устройств
-• Полная анонимность - никаких логов
-
-{EMOJI['gift']} <b>Специальное предложение!</b>
-Первый месяц всего за 109₽
+{EMOJI['cross']} Подписка не найдена. Начните настройку, чтобы сгенерировать ключ.
 """
     else:
         # Пользователь найден - показываем его данные
@@ -731,12 +962,12 @@ def show_vpn_links(message, username):
 • Подписка: Готова к установке
 
 {EMOJI['info']} <b>Выберите тип ссылки:</b>
-• VLESS - для отдельных серверов
-• Подписка - для автоматического обновления
+• VLESS — для отдельных серверов
+• Подписка — для автообновления
 
-{EMOJI['device']} <b>Поддерживаемые приложения:</b>
-• v2rayNG, V2Box, Shadowrocket
-• Clash, Sing-box, Outline
+{EMOJI['device']} <b>Рекомендуемые приложения:</b>
+• iOS/macOS: v2raytun
+• Android/Windows/AndroidTV: Hiddify
 """
     
     try:
@@ -881,7 +1112,6 @@ def show_subscription_link(message, username):
         text = f"{EMOJI['cross']} Пользователь не найден"
     else:
         subscription_url = user_info['subscription_url']
-        keyboard.add(types.InlineKeyboardButton(f"{EMOJI['robot']} @yovpnrobot", url="https://t.me/yovpnrobot"))
         keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data=f"get_link_{username}"))
         
         text = f"""
@@ -897,8 +1127,7 @@ def show_subscription_link(message, username):
 3. Приложение автоматически обновит серверы
 
 {EMOJI['device']} <b>Поддерживаемые приложения:</b>
-• Clash, Sing-box, Outline
-• v2rayNG (через подписку)
+• Clash, Sing-box, Outline, v2rayNG
 """
     
     try:
@@ -990,14 +1219,18 @@ def show_balance_menu(message):
         types.InlineKeyboardButton(f"{EMOJI['back']} Вернуться в личный кабинет", callback_data="back_to_main")
     )
     
+    # Фактический баланс
+    user_rec = get_user_record(message.from_user.id)
+    balance = int(user_rec.get('balance_rub', 0)) if user_rec else 0
+    days = days_from_balance(balance)
     text = f"""
-{EMOJI['balance']} <b>Баланс:</b> 0 ₽
+{EMOJI['balance']} <b>Баланс:</b> {balance} ₽  (≈ {days} дн.)
 
 {EMOJI['info']} <b>Доступные действия:</b>
 
-{EMOJI['payment']} <b>Пополнить баланс</b> - Добавить средства на счет
-{EMOJI['history']} <b>История пополнения</b> - Посмотреть все транзакции
-{EMOJI['coupon']} <b>Активировать купон</b> - Ввести промокод
+{EMOJI['payment']} <b>Пополнить баланс</b> — Добавить средства на счет
+{EMOJI['history']} <b>История пополнения</b> — Посмотреть транзакции
+{EMOJI['coupon']} <b>Активировать купон</b> — Ввести промокод
 """
     
     bot.edit_message_text(
@@ -1012,28 +1245,26 @@ def show_invite_menu(message):
     """Показать меню приглашений"""
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     
+    ref_user_id = message.from_user.id
+    share_link = f"https://t.me/{bot.get_me().username}?start=ref_{ref_user_id}"
     keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['share']} Поделиться ссылкой", url=f"https://t.me/share/url?url=https://t.me/{bot.get_me().username}?start=ref_{message.from_user.username}&text=Присоединяйся к лучшему VPN сервису!"),
+        types.InlineKeyboardButton(f"{EMOJI['share']} Поделиться ссылкой", url=f"https://t.me/share/url?url={share_link}&text=Присоединяйся к YoVPN!"),
         types.InlineKeyboardButton(f"{EMOJI['qr']} Показать QR-код", callback_data="show_qr"),
         types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main")
     )
     
+    rec = get_user_record(ref_user_id)
+    ref_count = len(rec.get('referrals', [])) if rec else 0
+    income = ref_count * 12
     text = f"""
 {EMOJI['referral']} <b>Реферальная система</b>
 
 {EMOJI['info']} <b>Ваша статистика:</b>
-• Приглашено: 0 человек
-• Доход с рефералов: 0 ₽
+• Приглашено: {ref_count} человек(а)
+• Доход с рефералов: {income} ₽ (10 ₽ + 2 ₽ бонус/чел)
 
 {EMOJI['link']} <b>Ваша реферальная ссылка:</b>
-https://t.me/{bot.get_me().username}?start=ref_{message.from_user.username}
-
-{EMOJI['info']} <b>Уровни реферальной программы:</b>
-• 1-й уровень: 25% от платежа
-• 2-й уровень: 25% от платежа
-• 3-й уровень: 10% от платежа
-• 4-й уровень: 5% от платежа
-• 5-й уровень: 2% от платежа
+{share_link}
 """
     
     bot.edit_message_text(
@@ -1049,18 +1280,20 @@ def show_referrals_menu(message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
     
-    text = f"""
-{EMOJI['referral']} <b>Мои рефералы:</b>
+    rec = get_user_record(message.from_user.id)
+    ref_list = rec.get('referrals', []) if rec else []
+    income = len(ref_list) * 12
+    if not ref_list:
+        text = f"""
+{EMOJI['referral']} <b>Мои рефералы</b>
 
-{EMOJI['cross']} <b>Рефералов пока нет</b>
-
-{EMOJI['info']} <b>Статистика:</b>
-• Всего приглашено: 0
-• Активных: 0
-• Доход: 0 ₽
-
-{EMOJI['link']} <b>Пригласите друзей и получайте доход!</b>
+{EMOJI['cross']} Рефералов пока нет.
+{EMOJI['info']} Делитесь своей ссылкой в «Пригласить друга».\nЗа каждого — 10 ₽ + 2 ₽ бонус (3 дня).
 """
+    else:
+        lines = [f"{EMOJI['referral']} <b>Мои рефералы</b>", ""]
+        lines.append(f"Всего: {len(ref_list)} | Доход: {income} ₽")
+        text = "\n".join(lines)
     
     bot.edit_message_text(
         text,
@@ -1100,8 +1333,8 @@ def show_about_service(message):
 • Outline, Shadowsocks
 • WireGuard, OpenVPN
 
-{EMOJI['support']} <b>Техподдержка:</b>
-Работаем круглосуточно для решения ваших вопросов
+{EMOJI['support']} <b>Техподдержка:</b> @icewhipe
+{EMOJI['channel']} <b>Канал:</b> @yodevelop
 """
     
     bot.edit_message_text(
@@ -1122,11 +1355,10 @@ def handle_subscription_purchase(message, callback_data):
     text = f"""
 {EMOJI['subscription']} <b>Покупка подписки на {months} месяц(а)</b>
 
-{EMOJI['warning']} <b>Платежная система не настроена</b>
+{EMOJI['warning']} Платежная система скоро будет доступна.
 
-{EMOJI['info']} <b>Для активации подписки обратитесь к администратору</b>
-
-{EMOJI['support']} <b>Поддержка:</b> @your_support
+{EMOJI['support']} <b>Поддержка:</b> @icewhipe
+{EMOJI['channel']} <b>Канал:</b> @yodevelop
 """
     
     bot.edit_message_text(
@@ -1145,14 +1377,10 @@ def show_payment_options(message):
     text = f"""
 {EMOJI['payment']} <b>Пополнение баланса</b>
 
-{EMOJI['warning']} <b>Платежная система не настроена</b>
+{EMOJI['warning']} Платежная система скоро будет доступна.
 
-{EMOJI['info']} <b>Доступные способы оплаты:</b>
-• Банковские карты
-• Криптовалюты
-• Электронные кошельки
-
-{EMOJI['support']} <b>Для пополнения обратитесь к администратору</b>
+{EMOJI['support']} <b>Поддержка:</b> @icewhipe
+{EMOJI['channel']} <b>Канал:</b> @yodevelop
 """
     
     bot.edit_message_text(
@@ -1258,9 +1486,8 @@ def show_support_chat(message):
 
 {EMOJI['info']} <b>Свяжитесь с нами:</b>
 
-{EMOJI['support']} <b>Техподдержка:</b> @your_support
-{EMOJI['channel']} <b>Канал:</b> @your_channel
-{EMOJI['info']} <b>Email:</b> support@yourdomain.com
+{EMOJI['support']} <b>Техподдержка:</b> @icewhipe
+{EMOJI['channel']} <b>Канал:</b> @yodevelop
 
 {EMOJI['info']} <b>Время работы:</b> 24/7
 """
@@ -1288,7 +1515,7 @@ def show_channel_link(message):
 {EMOJI['check']} Полезных советов по VPN
 {EMOJI['check']} Специальных предложений
 
-{EMOJI['channel']} <b>Канал:</b> @your_channel
+{EMOJI['channel']} <b>Канал:</b> @yodevelop
 """
     
     bot.edit_message_text(
