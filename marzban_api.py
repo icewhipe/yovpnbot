@@ -193,13 +193,23 @@ class MarzbanAPI:
             return False
 
     def apply_balance_as_days(self, username: str, balance_rub: int) -> bool:
-        """Пересчитывает баланс (4 ₽ = 1 день) и обновляет expire на сумму дней. Обнуляет баланс у нас не будем.
-        Эта функция продлевает ровно на days_from_balance, не списывая баланс. Вызовите отдельно списание, если нужно.
-        """
-        days = max(0, balance_rub // 4)
-        if days <= 0:
-            return True
-        return self.extend_user_by_days(username, days)
+        """Устанавливает expire как now + (balance_rub // 4) дней (абсолютно), не наращивая при каждом вызове."""
+        try:
+            user = self.get_user_by_username(username)
+            if not user:
+                return False
+            days = max(0, balance_rub // 4)
+            target = datetime.now() + timedelta(days=days)
+            payload = {"expire": int(target.timestamp())}
+            resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+            if resp.status_code in (200, 204):
+                logger.info(f"Установлен expire {username} = now+{days} дней ({target})")
+                return True
+            logger.warning(f"Не удалось установить expire {username}: {resp.status_code} {resp.text}")
+            return False
+        except Exception as e:
+            logger.error(f"apply_balance_as_days error: {e}")
+            return False
     
     def create_test_user(self, username: str, telegram_id: int) -> Optional[Dict]:
         """Создать пользователя с тестовым периодом на 7 дней"""

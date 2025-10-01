@@ -404,24 +404,11 @@ def show_main_menu(message):
     # Создаем клавиатуру главного меню
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     
-    if user_info:
-        # Пользователь с подпиской
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['add']} Продлить подписку", callback_data="add_subscription"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
-    elif is_new_user:
-        # Новый пользователь
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['gift']} Получить тестовый период", callback_data=f"get_test_{username}"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
-    else:
-        # Пользователь уже получал тест
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['add']} Купить подписку", callback_data="add_subscription"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
+    # Верхний ряд: балансная модель
+    keyboard.add(
+        types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions"),
+        types.InlineKeyboardButton(f"{EMOJI['settings']} Настроить VPN", callback_data='start_setup')
+    )
     
     # Вторая строка: Баланс (длинная кнопка)
     keyboard.add(
@@ -500,31 +487,22 @@ def show_main_menu(message):
         )
 
 def show_subscription_options(message):
-    """Показать варианты подписок"""
+    """Балансная модель: рассказываем как пополнить и что 4 ₽ = 1 день."""
     keyboard = types.InlineKeyboardMarkup(row_width=1)
-    
     keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['subscription']} 1 месяц - 109 ₽", callback_data="subscribe_1"),
-        types.InlineKeyboardButton(f"{EMOJI['subscription']} 3 месяца - 319 ₽", callback_data="subscribe_3"),
-        types.InlineKeyboardButton(f"{EMOJI['subscription']} 6 месяцев - 628 ₽", callback_data="subscribe_6"),
-        types.InlineKeyboardButton(f"{EMOJI['subscription']} 12 месяцев - 999 ₽", callback_data="subscribe_12"),
+        types.InlineKeyboardButton(f"{EMOJI['balance']} Пополнить баланс", callback_data="top_up_balance"),
         types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main")
     )
-    
+
     text = f"""
-{EMOJI['subscription']} <b>Выберите тарифный план:</b>
+{EMOJI['subscription']} <b>Подписка по балансу</b>
 
-<b>1 месяц</b> - 109 ₽
-<b>3 месяца</b> - 319 ₽ (скидка 3%)
-<b>6 месяцев</b> - 628 ₽ (скидка 4%)
-<b>12 месяцев</b> - 999 ₽ (скидка 24%)
+{EMOJI['info']} Каждые 4 ₽ = 1 день подписки.\n
+Пополняйте баланс на любую сумму — срок действия автоматически применяется.
 
-{EMOJI['device']} <b>Лимит устройств:</b> 3
-{EMOJI['speed']} <b>Скорость:</b> Без ограничений
-{EMOJI['security']} <b>Безопасность:</b> Военный уровень
-{EMOJI['no_logs']} <b>Логи:</b> Не ведем
+{EMOJI['speed']} Безлимитная скорость\n{EMOJI['no_logs']} Без логов\n{EMOJI['security']} Защита уровня VLESS (Reality)
 """
-    
+
     bot.edit_message_text(
         text,
         message.chat.id,
@@ -534,7 +512,7 @@ def show_subscription_options(message):
     )
 
 def get_test_period(message, username):
-    """Получить тестовый период с анимацией"""
+    """Получить тестовый период с анимацией (отключено в балансной модели)."""
     import time
     import threading
     
@@ -634,12 +612,8 @@ def get_test_period(message, username):
     # Ждем завершения анимации
     animation_thread.join()
     
-    # Создаем тестовый аккаунт
-    logger.info(f"Создаем тестовый аккаунт для пользователя {username}")
-    test_user = marzban_api.create_test_user(username, user_id)
-    
-    # Добавляем пользователя в список получивших тест
-    test_users.add(user_id)
+    # Отключено: бесплатный тест не предоставляется повторно и в балансной модели не показывается
+    test_user = None
     
     if test_user:
         # Тестовый аккаунт создан - показываем успех
@@ -649,15 +623,9 @@ def get_test_period(message, username):
         success_text = f"""
 {EMOJI['subscription']} <b>Мои подписки</b>
 
-{EMOJI['gift']} <b>🎉 Тестовый период активирован!</b>
+{EMOJI['cross']} <b>Бесплатный тест отключен</b>
 
-{EMOJI['active']} <b>Статус:</b> Активен (тест)
-{EMOJI['device']} <b>Устройства:</b> 0/3
-{EMOJI['warning']} <b>Трафик:</b> 0 B / ∞
-{EMOJI['info']} <b>Дней осталось:</b> 7
-
-{EMOJI['rocket']} <b>Добро пожаловать!</b>
-Вы получили 7 дней бесплатного доступа к VPN
+{EMOJI['info']} Пополняйте баланс: каждые 4 ₽ = 1 день.
 """
     else:
         # Ошибка создания
@@ -670,17 +638,7 @@ def get_test_period(message, username):
         success_text = f"""
 {EMOJI['subscription']} <b>Мои подписки</b>
 
-{EMOJI['cross']} <b>Ошибка создания тестового аккаунта</b>
-
-{EMOJI['rocket']} <b>Получите доступ к VPN:</b>
-• Свободный интернет без ограничений
-• Высокая скорость соединения
-• Военная защита данных
-• Подключение до 3 устройств
-• Полная анонимность - никаких логов
-
-{EMOJI['gift']} <b>Специальное предложение!</b>
-Первый месяц всего за 109₽
+{EMOJI['info']} Пополняйте баланс: каждые 4 ₽ = 1 день. Нажмите «Настроить VPN» для получения ключа.
 """
     
     try:
@@ -931,7 +889,7 @@ def show_my_subscriptions(message):
         text = f"""
 {EMOJI['subscription']} <b>Мои подписки</b>
 
-{EMOJI['cross']} Подписка не найдена. Начните настройку, чтобы сгенерировать ключ.
+{EMOJI['cross']} Активной конфигурации нет. Нажмите «Настроить VPN» чтобы получить ключ.
 """
     else:
         # Пользователь найден - показываем его данные
