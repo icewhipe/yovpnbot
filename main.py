@@ -660,6 +660,23 @@ def get_test_period(message, username):
 
 def show_setup_step1(message):
     """Шаг 1: Выбор устройства"""
+    # Короткая анимация загрузки 4-5 сек (редактируемые сообщения)
+    try:
+        frames = [
+            f"{EMOJI['hourglass']} Инициализация аккаунта…",
+            f"{EMOJI['loading']} Подготовка окружения…",
+            f"{EMOJI['loading']} Настройка безопасности…",
+            f"{EMOJI['check']} Почти готово…"
+        ]
+        for frame in frames:
+            try:
+                bot.edit_message_text(frame, message.chat.id, message.message_id, parse_mode='HTML')
+            except Exception:
+                tmp = bot.send_message(message.chat.id, frame, parse_mode='HTML')
+                message = tmp
+            time.sleep(1)
+    except Exception:
+        pass
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
         types.InlineKeyboardButton("iOS", callback_data='choose_device_ios'),
@@ -860,6 +877,12 @@ def finish_setup(message):
         bot.edit_message_text("🎉 Настройка завершена!", message.chat.id, message.message_id)
     except Exception:
         bot.send_message(message.chat.id, "🎉 Настройка завершена!")
+    # Показать анимированный эффект конфетти (GIF)
+    try:
+        confetti_url = "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif"
+        bot.send_animation(message.chat.id, confetti_url, caption="Готово! Добро пожаловать в YoVPN ✨")
+    except Exception:
+        pass
     show_main_menu(message)
 
 def show_my_subscriptions(message):
