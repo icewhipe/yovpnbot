@@ -90,6 +90,7 @@ def ensure_user_record(user_id, username, first_name):
                 "first_start_completed": False,
                 "referred_by": None,
                 "referrals": [],
+                "referrals_confirmed": [],
                 "device": None,
                 "app_link": None,
                 "vless_link": None,
@@ -169,11 +170,34 @@ def record_referral(referrer_user_id: int, referred_user_id: int):
             ref_list = referrer.get("referrals", [])
             ref_list.append(referred_user_id)
             referrer["referrals"] = ref_list
-        # Начисляем 12 ₽ (10 ₽ + 2 ₽ бонус для 3-го дня)
-        ref_bonus = 12
-        referrer["balance_rub"] = max(0, int(referrer.get("balance_rub", 0)) + ref_bonus)
+        # Начисление перенесено на момент активации ключа (confirm_referral_bonus)
         _save_data(DATA)
-        logger.info(f"Реферал: {referrer_user_id} получил {ref_bonus} ₽ за {referred_user_id}")
+        logger.info(f"Реферал сохранен: {referrer_user_id} -> {referred_user_id}")
+        return True
+
+def confirm_referral_bonus(referred_user_id: int):
+    """Начисляет 10 ₽ рефереру, когда реферал активировал ключ (создан конфиг)."""
+    global DATA
+    with DATA_LOCK:
+        referred = DATA.get("users", {}).get(str(referred_user_id))
+        if not referred:
+            return False
+        referrer_id = referred.get("referred_by")
+        if not referrer_id:
+            return False
+        referrer = DATA.get("users", {}).get(str(referrer_id))
+        if not referrer:
+            return False
+        # Избегаем повторного начисления
+        already = str(referred_user_id) in [str(x) for x in referrer.get("referrals_confirmed", [])]
+        if already:
+            return False
+        referrer["balance_rub"] = max(0, int(referrer.get("balance_rub", 0)) + 10)
+        lst = referrer.get("referrals_confirmed", [])
+        lst.append(referred_user_id)
+        referrer["referrals_confirmed"] = lst
+        _save_data(DATA)
+        logger.info(f"Реферал подтвержден: {referrer_id} получил 10 ₽ за {referred_user_id}")
         return True
 
 # Список пользователей, которые уже получили тестовый период
@@ -244,10 +268,7 @@ def start_command(message):
     except Exception as e:
         logger.warning(f"Не удалось обработать реферальный параметр: {e}")
     
-    # Приветственный бонус 20 ₽ (однократно)
-    if not record.get('bonus_given'):
-        credit_balance(user_id, 20, reason='welcome_bonus')
-        update_user_record(user_id, {"bonus_given": True})
+    # Приветственный бонус теперь начисляется после успешной активации ключа (см. continue_setup_flow)
     
     # Если это самый первый /start — показываем приветствие с кнопкой настройки
     if not record.get('first_start_completed'):
@@ -787,6 +808,13 @@ def continue_setup_flow(message):
 
     update_user_record(message.from_user.id, {"vless_link": vless_link, "subscription_url": sub_url})
 
+    # Начисляем приветственный бонус только при успешном получении ключа
+    if vless_link and not get_user_record(message.from_user.id).get('bonus_given'):
+        credit_balance(message.from_user.id, 20, reason='welcome_bonus_after_activation')
+        update_user_record(message.from_user.id, {"bonus_given": True})
+        # Подтверждаем реферальный бонус (10 ₽) рефереру
+        confirm_referral_bonus(message.from_user.id)
+
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     keyboard.add(
         types.InlineKeyboardButton("Завершить настройку", callback_data='finish_setup'),
@@ -802,6 +830,12 @@ def continue_setup_flow(message):
         text_lines.append(f"<code>{vless_link}</code>")
     else:
         text_lines.append(f"{EMOJI['cross']} Не удалось получить ключ. Попробуйте позже.")
+    if sub_url:
+        text_lines.extend([
+            "",
+            f"{EMOJI['subscription']} <b>Ссылка-подписка:</b>",
+            f"<code>{sub_url}</code>",
+        ])
     text_lines.extend([
         "",
         f"{EMOJI['info']} <b>Шаг 4.</b> Откройте выбранное приложение и вставьте ключ.",
