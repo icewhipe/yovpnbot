@@ -254,11 +254,21 @@ class MarzbanAPI:
                 return False
             days = max(0, balance_rub // 4)
             target = datetime.now() + timedelta(days=days)
-            payload = {"expire": int(target.timestamp())}
+            ts = int(target.timestamp())
+            payload = {"expire": ts}
+            # Сначала пробуем PATCH
             resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
             if resp.status_code in (200, 204):
-                logger.info(f"Установлен expire {username} = now+{days} дней ({target})")
+                logger.info(f"Установлен expire {username} = now+{days} дней ({target}) [PATCH]")
                 return True
+            # Если метод не разрешен, пробуем PUT
+            if resp.status_code == 405:
+                resp2 = self.session.put(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+                if resp2.status_code in (200, 204):
+                    logger.info(f"Установлен expire {username} = now+{days} дней ({target}) [PUT]")
+                    return True
+                logger.warning(f"Не удалось установить expire {username} (PUT): {resp2.status_code} {resp2.text}")
+                return False
             logger.warning(f"Не удалось установить expire {username}: {resp.status_code} {resp.text}")
             return False
         except Exception as e:
