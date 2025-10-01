@@ -1282,13 +1282,13 @@ def show_invite_menu(message):
     
     rec = get_user_record(ref_user_id)
     ref_count = len(rec.get('referrals', [])) if rec else 0
-    income = ref_count * 12
+    income = ref_count * 10
     text = f"""
 {EMOJI['referral']} <b>Реферальная система</b>
 
 {EMOJI['info']} <b>Ваша статистика:</b>
 • Приглашено: {ref_count} человек(а)
-• Доход с рефералов: {income} ₽ (10 ₽ + 2 ₽ бонус/чел)
+• Доход с рефералов: {income} ₽ (10 ₽ за приглашенного)
 
 {EMOJI['link']} <b>Ваша реферальная ссылка:</b>
 {share_link}
@@ -1309,13 +1309,13 @@ def show_referrals_menu(message):
     
     rec = get_user_record(message.from_user.id)
     ref_list = rec.get('referrals', []) if rec else []
-    income = len(ref_list) * 12
+    income = len(ref_list) * 10
     if not ref_list:
         text = f"""
 {EMOJI['referral']} <b>Мои рефералы</b>
 
 {EMOJI['cross']} Рефералов пока нет.
-{EMOJI['info']} Делитесь своей ссылкой в «Пригласить друга».\nЗа каждого — 10 ₽ + 2 ₽ бонус (3 дня).
+{EMOJI['info']} Делитесь своей ссылкой в «Пригласить друга».\nЗа каждого — 10 ₽ в баланс.
 """
     else:
         lines = [f"{EMOJI['referral']} <b>Мои рефералы</b>", ""]
