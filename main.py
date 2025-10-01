@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+THIS SHOULD BE A LINTER ERROR#!/usr/bin/env python3
 """
 Telegram Bot для пользователей Marzban
 """
@@ -46,7 +46,9 @@ bot = telebot.TeleBot(BOT_TOKEN)
 marzban_api = MarzbanAPI(MARZBAN_API_URL, MARZBAN_ADMIN_TOKEN)
 
 # Простое хранилище данных (JSON) для баланса/рефералок/настроек
-DATA_FILE = '/workspace/data.json'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('DATA_DIR', BASE_DIR)
+DATA_FILE = os.path.join(DATA_DIR, 'data.json')
 DATA_LOCK = threading.Lock()
 
 def _load_data():
@@ -60,6 +62,7 @@ def _load_data():
 
 def _save_data(data):
     try:
+        os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
         with open(DATA_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     except Exception as e:
