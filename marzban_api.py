@@ -203,6 +203,20 @@ class MarzbanAPI:
             "user_data": user_data
         }
 
+    def set_user_inbounds(self, username: str, inbounds_map: Dict[str, list]) -> bool:
+        """Назначить пользователю теги инбаундов по протоколам, например {"vless": ["VLESS TCP REALITY"]}."""
+        try:
+            payload = {"inbounds": inbounds_map}
+            resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+            if resp.status_code in (200, 204):
+                logger.info(f"Назначены inbounds {inbounds_map} пользователю {username}")
+                return True
+            logger.warning(f"Не удалось назначить inbounds {inbounds_map} для {username}: {resp.status_code} {resp.text}")
+            return False
+        except Exception as e:
+            logger.error(f"set_user_inbounds error: {e}")
+            return False
+
     # ===== Баланс → дни → продление подписки =====
     def extend_user_by_days(self, username: str, add_days: int) -> bool:
         """Продлевает срок действия пользователя на add_days от текущей даты (или от текущего expire)."""
@@ -265,6 +279,8 @@ class MarzbanAPI:
         user_uuid = str(uuid.uuid4())
         
         # Минимальная структура для создания пользователя
+        inbound_tag = os.environ.get('VLESS_INBOUND_TAG', 'VLESS TCP REALITY')
+
         user_data = {
             "username": clean_username,
             "expire": expire_timestamp,
@@ -275,7 +291,9 @@ class MarzbanAPI:
                     "id": user_uuid,
                     "flow": "xtls-rprx-vision"
                 }
-            }
+            },
+            # Некоторые версии API поддерживают поле inbounds при создании
+            "inbounds": {"vless": [inbound_tag]}
         }
         
         try:
@@ -289,7 +307,13 @@ class MarzbanAPI:
             
             if response.status_code == 200:
                 logger.info(f"Создан тестовый пользователь {clean_username}")
-                return response.json()
+                created = response.json()
+                # Доп. попытка назначить inbound тег патчем, если требуется
+                try:
+                    self.set_user_inbounds(clean_username, {"vless": [inbound_tag]})
+                except Exception:
+                    pass
+                return created
             else:
                 logger.warning(f"Ошибка создания пользователя {clean_username}: {response.status_code}")
                 logger.warning(f"Ответ API: {response.text}")
