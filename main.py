@@ -89,9 +89,11 @@ def ensure_user_record(user_id, username, first_name):
                 "balance_rub": 0,
                 "bonus_given": False,
                 "first_start_completed": False,
+                "first_setup_confetti_sent": False,
                 "referred_by": None,
                 "referrals": [],
                 "referrals_confirmed": [],
+                "blocked": False,
                 "device": None,
                 "app_link": None,
                 "vless_link": None,
@@ -140,6 +142,12 @@ def credit_balance(user_id, amount_rub, reason: str = ""):
         rec["balance_rub"] = max(0, int(rec.get("balance_rub", 0)) + int(amount_rub))
         _save_data(DATA)
     logger.info(f"Зачисление {amount_rub} ₽ пользователю {user_id}. Причина: {reason}")
+    # Уведомление пользователю о поступлении средств
+    try:
+        kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(f"{EMOJI['balance']} Открыть баланс", callback_data='balance'))
+        bot.send_message(int(user_id), f"{EMOJI['gift']} На ваш баланс зачислено {amount_rub} ₽", reply_markup=kb)
+    except Exception:
+        pass
 
 def days_from_balance(balance_rub: int) -> int:
     try:
@@ -258,6 +266,9 @@ def start_command(message):
     logger.info(f"Команда /start: ID={user_id}, Username=@{username}, FirstName={first_name}")
     
     record = ensure_user_record(user_id, username, first_name)
+    if record.get('blocked'):
+        bot.send_message(message.chat.id, f"{EMOJI['lock']} Доступ ограничен. Обратитесь в поддержку @icewhipe")
+        return
     
     # Обрабатываем реферальный параметр: /start ref_<id|username>
     try:
@@ -290,6 +301,13 @@ def start_command(message):
         )
         bot.send_message(message.chat.id, welcome_text, parse_mode='HTML', reply_markup=keyboard)
         update_user_record(user_id, {"first_start_completed": True})
+        # Первый /start: конфетти-эффект
+        try:
+            if not record.get('first_setup_confetti_sent'):
+                bot.send_animation(message.chat.id, "https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif")
+                update_user_record(user_id, {"first_setup_confetti_sent": True})
+        except Exception:
+            pass
         return
     
     # Иначе показываем главное меню
