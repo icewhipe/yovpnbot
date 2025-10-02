@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN = config('USERBOT_TOKEN', default='8385845645:AAGiZhSwkRgndegtTsy573Smnul2wFNwLu0')
 MARZBAN_API_URL = config('MARZBAN_API_URL', default='https://alb-vpnprimex.duckdns.org:443/api')
 MARZBAN_ADMIN_TOKEN = config('MARZBAN_ADMIN_TOKEN', default='')
+MARZBAN_TIMEOUT = config('MARZBAN_TIMEOUT', default=4, cast=int)
 DB_HOST = config('DB_HOST', default='localhost')
 DB_PORT = config('DB_PORT', default=3306, cast=int)
 DB_NAME = config('DB_NAME', default='marzban')
@@ -45,7 +46,7 @@ ADMIN_PASSWORD = config('ADMIN_PASSWORD', default='')
 bot = telebot.TeleBot(BOT_TOKEN)
 
 # Инициализация Marzban API с токеном
-marzban_api = MarzbanAPI(MARZBAN_API_URL, MARZBAN_ADMIN_TOKEN)
+marzban_api = MarzbanAPI(MARZBAN_API_URL, MARZBAN_ADMIN_TOKEN, timeout=MARZBAN_TIMEOUT)
 
 # Простое хранилище данных (JSON) для баланса/рефералок/настроек
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

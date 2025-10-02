@@ -54,6 +54,7 @@ class MarzbanAPI:
         logger.info(f"Ищем пользователя в Marzban: {clean_username}")
         
         try:
+            # Быстрое чтение: уменьшаем количество полей/таймаут уже снижен
             response = self._request('GET', f"{self.api_url}/user/{clean_username}")
             
             if response and response.status_code == 200:
