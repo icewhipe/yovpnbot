@@ -100,6 +100,8 @@ def ensure_user_record(user_id, username, first_name):
                 "app_link": None,
                 "vless_link": None,
                 "subscription_url": None
+                ,
+                "history": []
             }
             data_users[str(user_id)] = record
             _save_data(DATA)
@@ -142,6 +144,9 @@ def credit_balance(user_id, amount_rub, reason: str = ""):
         if not rec:
             return
         rec["balance_rub"] = max(0, int(rec.get("balance_rub", 0)) + int(amount_rub))
+        hist = rec.get('history', [])
+        hist.append({"type": "credit", "amount": int(amount_rub), "reason": reason, "ts": int(time.time())})
+        rec['history'] = hist
         _save_data(DATA)
     logger.info(f"Зачисление {amount_rub} ₽ пользователю {user_id}. Причина: {reason}")
     # Синхронизируем срок действия в Marzban по новому балансу (устанавливаем expire = now + days)
@@ -598,11 +603,11 @@ def show_main_menu(message):
         marzban_api.apply_balance_as_days(username, int(get_user_record(user_id).get('balance_rub', 0)))
     except Exception:
         pass
-    # Проверяем, есть ли у пользователя подписка
-    user_info = marzban_api.get_user_info(username) if username else None
+    # Проверяем, есть ли у пользователя подписка (делаем после быстрой отрисовки)
+    user_info = None
     is_new_user = user_id not in test_users
     
-    # Создаем клавиатуру главного меню
+    # Создаем клавиатуру главного меню (сразу показываем)
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     
     # Верхний ряд: балансная модель
@@ -674,14 +679,7 @@ def show_main_menu(message):
     bal = int(get_user_record(user_id).get('balance_rub', 0))
     days = bal // 4
     hours = (bal % 4) * 6
-    status_text = 'ВПН на техобслуживании'
-    ui = marzban_api.get_user_info(username)
-    if ui and isinstance(ui, dict):
-        st = ui.get('status')
-        if st == 'active':
-            status_text = 'ВПН активен'
-        elif st == 'expired':
-            status_text = 'ВПН просрочился'
+    status_text = 'Проверяем статус…'
 
     welcome_text = f"""
 {EMOJI['user']} <b>Личный кабинет</b>
@@ -694,8 +692,10 @@ def show_main_menu(message):
 {EMOJI['rocket']} <b>Выберите действие:</b>
 """
 
+    # Сначала отправляем быстрое сообщение
+    sent = None
     try:
-        bot.edit_message_text(
+        sent = bot.edit_message_text(
             welcome_text,
             message.chat.id,
             message.message_id,
@@ -703,12 +703,39 @@ def show_main_menu(message):
             reply_markup=keyboard
         )
     except Exception:
-        bot.send_message(
+        sent = bot.send_message(
             message.chat.id,
             welcome_text,
             parse_mode='HTML',
             reply_markup=keyboard
         )
+
+    # Асинхронное обновление статуса (быстрая доотрисовка)
+    try:
+        ui = marzban_api.get_user_info(username)
+        if ui and isinstance(ui, dict):
+            st = ui.get('status')
+            if st == 'active':
+                status_text = 'ВПН активен'
+            elif st == 'expired':
+                status_text = 'ВПН просрочился'
+            else:
+                status_text = 'ВПН на техобслуживании'
+        else:
+            status_text = 'ВПН на техобслуживании'
+        updated_text = f"""
+{EMOJI['user']} <b>Личный кабинет</b>
+
+<b>Пользователь:</b> {first_name} (@{username})
+<b>ID:</b> {user_id}
+<b>Баланс:</b> {bal} ₽  (≈ {days} дн. {hours} ч.)
+<b>Статус:</b> {status_text}
+
+{EMOJI['rocket']} <b>Выберите действие:</b>
+"""
+        bot.edit_message_text(updated_text, sent.chat.id, sent.message_id, parse_mode='HTML', reply_markup=keyboard)
+    except Exception:
+        pass
 
 def show_subscription_options(message):
     """Балансная модель: рассказываем как пополнить и что 4 ₽ = 1 день."""
@@ -1565,7 +1592,10 @@ def show_invite_menu(message):
 def show_referrals_menu(message):
     """Показать мои рефералы"""
     keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    keyboard.add(
+        types.InlineKeyboardButton("Пригласить друга", callback_data="invite_friend"),
+        types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main")
+    )
     
     rec = get_user_record(message.from_user.id)
     ref_list = rec.get('referrals', []) if rec else []
@@ -1682,13 +1712,28 @@ def show_payment_history(message):
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="balance"))
     
-    text = f"""
+    rec = get_user_record(message.from_user.id)
+    hist = (rec or {}).get('history', [])
+    if not hist:
+        text = f"""
 {EMOJI['history']} <b>История пополнения</b>
 
 {EMOJI['cross']} <b>Транзакций пока нет</b>
 
-{EMOJI['info']} <b>Здесь будут отображаться все ваши платежи</b>
+{EMOJI['info']} <b>Здесь будут отображаться пополнения и промокоды</b>
 """
+    else:
+        lines = [f"{EMOJI['history']} <b>История пополнения</b>", ""]
+        for entry in reversed(hist[-10:]):
+            kind = entry.get('type'); amt = entry.get('amount'); reason = entry.get('reason','')
+            label = 'Пополнение'
+            if kind == 'credit' and reason.startswith('promo_'):
+                label = 'Промокод'
+            elif kind == 'credit':
+                label = 'Пополнение'
+            ts = entry.get('ts')
+            lines.append(f"• {label}: +{amt} ₽ ({reason})")
+        text = "\n".join(lines)
     
     bot.edit_message_text(
         text,
