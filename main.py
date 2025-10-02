@@ -40,7 +40,7 @@ DB_PORT = config('DB_PORT', default=3306, cast=int)
 DB_NAME = config('DB_NAME', default='marzban')
 DB_USER = config('DB_USER', default='marzban')
 DB_PASSWORD = config('DB_PASSWORD', default='DcR92D5bNArCjVTpakf')
-ADMIN_PASSWORD = config('ADMIN_PASSWORD', default='')
+ADMIN_PASSWORD = config('ADMIN_PASSWORD', default='CzCFSGouP7A6mkQ5')
 ADMIN_USER_ID = config('ADMIN_USER_ID', default=7610842643, cast=int)
 
 # Создание бота
