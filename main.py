@@ -1033,10 +1033,16 @@ def continue_setup_flow(message):
         confirm_referral_bonus(message.from_user.id)
 
     keyboard = types.InlineKeyboardMarkup(row_width=1)
-    keyboard.add(
-        types.InlineKeyboardButton("Завершить настройку", callback_data='finish_setup'),
-        types.InlineKeyboardButton("Показать в виде QR-кода", callback_data='show_qr_key')
-    )
+    if sub_url:
+        keyboard.add(
+            types.InlineKeyboardButton("Завершить настройку", callback_data='finish_setup'),
+            types.InlineKeyboardButton("Показать в виде QR-кода", callback_data='show_qr_key')
+        )
+    else:
+        keyboard.add(
+            types.InlineKeyboardButton("Повторить настройку", callback_data='start_setup'),
+            types.InlineKeyboardButton("Поддержка", callback_data='support_chat')
+        )
 
     text_lines = [
         f"{EMOJI['check']} <b>Шаг 3.</b> Подписка готова!",
@@ -1050,7 +1056,11 @@ def continue_setup_flow(message):
             f"{EMOJI['info']} Импортируйте ссылку в приложение. Клиент сам обновляет узлы.",
         ])
     else:
-        text_lines.append(f"{EMOJI['cross']} Не удалось получить ссылку-подписку. Попробуйте позже или обратитесь в поддержку.")
+        text_lines = [
+            f"{EMOJI['cross']} <b>Ошибка при выдаче подписки</b>",
+            "",
+            f"{EMOJI['info']} Попробуйте повторить настройку или обратитесь в поддержку.",
+        ]
 
     final_text = "\n".join(text_lines)
     try:
