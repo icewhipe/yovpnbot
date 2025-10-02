@@ -281,8 +281,8 @@ class MarzbanAPI:
         
         clean_username = username.lstrip('@')
         
-        # Вычисляем дату окончания тестового периода (7 дней)
-        expire_date = datetime.now() + timedelta(days=7)
+        # Вычисляем дату окончания тестового периода (5 дней под приветственный баланс 20 ₽)
+        expire_date = datetime.now() + timedelta(days=5)
         expire_timestamp = int(expire_date.timestamp())
         
         # Генерируем UUID для пользователя

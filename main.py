@@ -142,10 +142,47 @@ def credit_balance(user_id, amount_rub, reason: str = ""):
         rec["balance_rub"] = max(0, int(rec.get("balance_rub", 0)) + int(amount_rub))
         _save_data(DATA)
     logger.info(f"Зачисление {amount_rub} ₽ пользователю {user_id}. Причина: {reason}")
+    # Синхронизируем срок действия в Marzban по новому балансу (устанавливаем expire = now + days)
+    try:
+        username = rec.get("username") if rec else None
+        if username:
+            marzban_api.apply_balance_as_days(username, int(DATA["users"][str(user_id)]["balance_rub"]))
+    except Exception:
+        pass
     # Уведомление пользователю о поступлении средств
     try:
         kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(f"{EMOJI['balance']} Открыть баланс", callback_data='balance'))
         bot.send_message(int(user_id), f"{EMOJI['gift']} На ваш баланс зачислено {amount_rub} ₽", reply_markup=kb)
+    except Exception:
+        pass
+
+def _sync_balance_from_subscription(user_id: int, username: str):
+    """Если прошло более 2 часов с последней синхронизации, привести локальный баланс к сроку подписки.
+    1 руб = 6 часов. Баланс округляется вниз до целых рублей.
+    """
+    try:
+        rec = get_user_record(user_id)
+        last_sync = (rec or {}).get('last_balance_sync_ts')
+        now_ts = int(time.time())
+        if last_sync and now_ts - int(last_sync) < 7200:
+            return
+        info = marzban_api.get_user_info(username)
+        if not info or not isinstance(info, dict):
+            update_user_record(user_id, {"last_balance_sync_ts": now_ts})
+            return
+        user_data = info.get('user_data') or {}
+        expire = user_data.get('expire')
+        if isinstance(expire, str):
+            from datetime import datetime
+            expire_dt = datetime.fromisoformat(expire.replace('Z', '+00:00'))
+            remaining_sec = max(0, int((expire_dt - datetime.now()).total_seconds()))
+        elif expire:
+            remaining_sec = max(0, int(expire - time.time()))
+        else:
+            remaining_sec = 0
+        # 1 руб = 6 часов = 21600 секунд
+        new_balance = remaining_sec // 21600
+        update_user_record(user_id, {"balance_rub": int(new_balance), "last_balance_sync_ts": now_ts})
     except Exception:
         pass
 
@@ -410,10 +447,12 @@ def show_main_menu(message):
     
     logger.info(f"Главное меню: ID={user_id}, Username=@{username}, FirstName={first_name}")
     
-    # Синхронизируем срок действия с балансом (каждые 4 ₽ = 1 день)
+    # Синхронизируем локальный баланс с подпиской (каждые 2 часа)
     user_rec = ensure_user_record(user_id, username, first_name)
+    _sync_balance_from_subscription(user_id, username)
     try:
-        marzban_api.apply_balance_as_days(username, int(user_rec.get('balance_rub', 0)))
+        # Устанавливаем expire как now + days (days = balance // 4)
+        marzban_api.apply_balance_as_days(username, int(get_user_record(user_id).get('balance_rub', 0)))
     except Exception:
         pass
     # Проверяем, есть ли у пользователя подписка
@@ -488,6 +527,30 @@ def show_main_menu(message):
 {EMOJI['rocket']} <b>Выберите действие:</b>
 """
     
+    # Вставляем в текст баланс и дни/часы
+    bal = int(get_user_record(user_id).get('balance_rub', 0))
+    days = bal // 4
+    hours = (bal % 4) * 6
+    status_text = 'ВПН на техобслуживании'
+    ui = marzban_api.get_user_info(username)
+    if ui and isinstance(ui, dict):
+        st = ui.get('status')
+        if st == 'active':
+            status_text = 'ВПН активен'
+        elif st == 'expired':
+            status_text = 'ВПН просрочился'
+
+    welcome_text = f"""
+{EMOJI['user']} <b>Личный кабинет</b>
+
+<b>Пользователь:</b> {first_name} (@{username})
+<b>ID:</b> {user_id}
+<b>Баланс:</b> {bal} ₽  (≈ {days} дн. {hours} ч.)
+<b>Статус:</b> {status_text}
+
+{EMOJI['rocket']} <b>Выберите действие:</b>
+"""
+
     try:
         bot.edit_message_text(
             welcome_text,
@@ -496,8 +559,7 @@ def show_main_menu(message):
             parse_mode='HTML',
             reply_markup=keyboard
         )
-    except Exception as e:
-        # Если не удалось отредактировать, отправляем новое
+    except Exception:
         bot.send_message(
             message.chat.id,
             welcome_text,
