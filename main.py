@@ -156,6 +156,14 @@ def credit_balance(user_id, amount_rub, reason: str = ""):
         bot.send_message(int(user_id), f"{EMOJI['gift']} На ваш баланс зачислено {amount_rub} ₽", reply_markup=kb)
     except Exception:
         pass
+    # Уведомление рефереру о пополнении приглашенным
+    try:
+        rec = get_user_record(user_id)
+        ref_id = rec.get('referred_by') if rec else None
+        if ref_id:
+            bot.send_message(int(ref_id), f"{EMOJI['share']} Ваш реферал ID {user_id} пополнил баланс на {amount_rub} ₽.")
+    except Exception:
+        pass
 
 def _load_promos():
     try:
@@ -249,6 +257,11 @@ def record_referral(referrer_user_id: int, referred_user_id: int):
         # Начисление перенесено на момент активации ключа (confirm_referral_bonus)
         _save_data(DATA)
         logger.info(f"Реферал сохранен: {referrer_user_id} -> {referred_user_id}")
+        # Уведомление рефереру о регистрации
+        try:
+            bot.send_message(int(referrer_user_id), f"{EMOJI['referral']} Ваш реферал ID {referred_user_id} перешёл в бота.")
+        except Exception:
+            pass
         return True
 
 def confirm_referral_bonus(referred_user_id: int):
@@ -274,6 +287,12 @@ def confirm_referral_bonus(referred_user_id: int):
         referrer["referrals_confirmed"] = lst
         _save_data(DATA)
         logger.info(f"Реферал подтвержден: {referrer_id} получил 10 ₽ за {referred_user_id}")
+        # Уведомление рефереру о активации и бонусе
+        try:
+            kb = types.InlineKeyboardMarkup().add(types.InlineKeyboardButton(f"{EMOJI['balance']} Открыть баланс", callback_data='balance'))
+            bot.send_message(int(referrer_id), f"{EMOJI['gift']} Реферал ID {referred_user_id} активировал аккаунт! +10 ₽ на ваш баланс.", reply_markup=kb)
+        except Exception:
+            pass
         return True
 
 # Список пользователей, которые уже получили тестовый период
@@ -863,21 +882,25 @@ def get_test_period(message, username):
 
 def show_setup_step1(message):
     """Шаг 1: Выбор устройства"""
-    # Короткая анимация загрузки 4-5 сек (редактируемые сообщения)
+    # Короткая анимация: если у юзера уже есть конфиг, показываем «поиск» 2-3 сек
     try:
-        frames = [
-            f"{EMOJI['hourglass']} Инициализация аккаунта…",
-            f"{EMOJI['loading']} Подготовка окружения…",
-            f"{EMOJI['loading']} Настройка безопасности…",
-            f"{EMOJI['check']} Почти готово…"
-        ]
-        for frame in frames:
+        username = message.from_user.username or (message.from_user.first_name or "user").lower().replace(" ", "_")
+        info = marzban_api.get_user_info(username)
+        frames = []
+        if info:
+            frames = [f"{EMOJI['loading']} Проверяем данные…", f"{EMOJI['loading']} Ищем пользователя в базе…", f"{EMOJI['check']} Найдено!"]
+            delay = 1
+        else:
+            # Для первых пользователей — анимация прогресса [-----] N%
+            frames = [f"[———-----] 30%", f"[—————---] 60%", f"[——————-] 90%", f"[———————] 100%"]
+            delay = 1
+        for f in frames:
             try:
-                bot.edit_message_text(frame, message.chat.id, message.message_id, parse_mode='HTML')
+                bot.edit_message_text(f, message.chat.id, message.message_id, parse_mode='HTML')
             except Exception:
-                tmp = bot.send_message(message.chat.id, frame, parse_mode='HTML')
+                tmp = bot.send_message(message.chat.id, f, parse_mode='HTML')
                 message = tmp
-            time.sleep(1)
+            time.sleep(delay)
     except Exception:
         pass
     keyboard = types.InlineKeyboardMarkup(row_width=2)
