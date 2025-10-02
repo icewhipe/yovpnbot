@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, List
 import logging
 import urllib3
+import time
 
 # Отключаем SSL предупреждения
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -32,6 +33,19 @@ class MarzbanAPI:
                 'Authorization': f'Bearer {admin_token}',
                 'Content-Type': 'application/json'
             })
+
+    def _request(self, method: str, url: str, retries: int = 3, backoff_base: float = 1.5, **kwargs):
+        last_exc = None
+        for attempt in range(retries):
+            try:
+                return self.session.request(method.upper(), url, timeout=self.timeout, **kwargs)
+            except requests.exceptions.RequestException as e:
+                last_exc = e
+                wait_s = backoff_base ** attempt
+                logger.warning(f"HTTP {method} {url} failed (attempt {attempt+1}/{retries}): {e}. Retry in {wait_s:.1f}s")
+                time.sleep(wait_s)
+        logger.warning(f"HTTP {method} {url} failed after {retries} attempts: {last_exc}")
+        return None
     
     def get_user_by_username(self, username: str) -> Optional[Dict]:
         """Получить пользователя по username"""
@@ -40,21 +54,20 @@ class MarzbanAPI:
         logger.info(f"Ищем пользователя в Marzban: {clean_username}")
         
         try:
-            response = self.session.get(
-                f"{self.api_url}/user/{clean_username}",
-                timeout=self.timeout
-            )
+            response = self._request('GET', f"{self.api_url}/user/{clean_username}")
             
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 user_data = response.json()
                 logger.info(f"Найден пользователь {clean_username} в Marzban")
                 return user_data
-            elif response.status_code == 404:
+            elif response and response.status_code == 404:
                 logger.info(f"Пользователь {clean_username} не найден в Marzban")
                 return None
             else:
-                logger.warning(f"Ошибка API для пользователя {clean_username}: {response.status_code}")
-                logger.warning(f"Ответ: {response.text}")
+                code = response.status_code if response else 'NO_RESPONSE'
+                body = response.text if response else ''
+                logger.warning(f"Ошибка API для пользователя {clean_username}: {code}")
+                logger.warning(f"Ответ: {body}")
                 return None
                 
         except Exception as e:
@@ -207,7 +220,7 @@ class MarzbanAPI:
         """Назначить пользователю теги инбаундов по протоколам, например {"vless": ["VLESS TCP REALITY"]}."""
         try:
             payload = {"inbounds": inbounds_map}
-            resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+            resp = self._request('PATCH', f"{self.api_url}/user/{username}", json=payload)
             if resp.status_code in (200, 204):
                 logger.info(f"Назначены inbounds {inbounds_map} пользователю {username}")
                 return True
@@ -236,7 +249,7 @@ class MarzbanAPI:
                 base = now
             new_expire = base + timedelta(days=add_days)
             payload = {"expire": int(new_expire.timestamp())}
-            resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+            resp = self._request('PATCH', f"{self.api_url}/user/{username}", json=payload)
             if resp.status_code in (200, 204):
                 logger.info(f"Продлен пользователь {username} на {add_days} дней (до {new_expire})")
                 return True
@@ -257,13 +270,13 @@ class MarzbanAPI:
             ts = int(target.timestamp())
             payload = {"expire": ts}
             # Сначала пробуем PATCH
-            resp = self.session.patch(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+            resp = self._request('PATCH', f"{self.api_url}/user/{username}", json=payload)
             if resp.status_code in (200, 204):
                 logger.info(f"Установлен expire {username} = now+{days} дней ({target}) [PATCH]")
                 return True
             # Если метод не разрешен, пробуем PUT
             if resp.status_code == 405:
-                resp2 = self.session.put(f"{self.api_url}/user/{username}", json=payload, timeout=self.timeout)
+                resp2 = self._request('PUT', f"{self.api_url}/user/{username}", json=payload)
                 if resp2.status_code in (200, 204):
                     logger.info(f"Установлен expire {username} = now+{days} дней ({target}) [PUT]")
                     return True
@@ -309,13 +322,9 @@ class MarzbanAPI:
         try:
             logger.info(f"Отправляем данные для создания пользователя {clean_username}: {json.dumps(user_data, indent=2)}")
             
-            response = self.session.post(
-                f"{self.api_url}/user",
-                json=user_data,
-                timeout=self.timeout
-            )
+            response = self._request('POST', f"{self.api_url}/user", json=user_data)
             
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 logger.info(f"Создан тестовый пользователь {clean_username}")
                 created = response.json()
                 # Доп. попытка назначить inbound тег патчем, если требуется
@@ -325,8 +334,10 @@ class MarzbanAPI:
                     pass
                 return created
             else:
-                logger.warning(f"Ошибка создания пользователя {clean_username}: {response.status_code}")
-                logger.warning(f"Ответ API: {response.text}")
+                code = response.status_code if response else 'NO_RESPONSE'
+                body = response.text if response else ''
+                logger.warning(f"Ошибка создания пользователя {clean_username}: {code}")
+                logger.warning(f"Ответ API: {body}")
                 return None
                 
         except Exception as e:
