@@ -39,6 +39,7 @@ DB_PORT = config('DB_PORT', default=3306, cast=int)
 DB_NAME = config('DB_NAME', default='marzban')
 DB_USER = config('DB_USER', default='marzban')
 DB_PASSWORD = config('DB_PASSWORD', default='DcR92D5bNArCjVTpakf')
+ADMIN_PASSWORD = config('ADMIN_PASSWORD', default='')
 
 # Создание бота
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -156,6 +157,35 @@ def credit_balance(user_id, amount_rub, reason: str = ""):
     except Exception:
         pass
 
+def _load_promos():
+    try:
+        promos = DATA.get('promos')
+        if promos is None:
+            DATA['promos'] = {}
+            _save_data(DATA)
+        return DATA.get('promos', {})
+    except Exception:
+        return {}
+
+def _save_promo(code: str, amount: int):
+    with DATA_LOCK:
+        promos = _load_promos()
+        promos[code] = {"amount": int(amount), "used": False}
+        DATA['promos'] = promos
+        _save_data(DATA)
+
+def _redeem_promo(user_id: int, code: str) -> bool:
+    with DATA_LOCK:
+        promos = _load_promos()
+        entry = promos.get(code)
+        if not entry or entry.get('used'):
+            return False
+        entry['used'] = True
+        promos[code] = entry
+        DATA['promos'] = promos
+        _save_data(DATA)
+    credit_balance(user_id, int(entry['amount']), reason=f'promo_{code}')
+    return True
 def _sync_balance_from_subscription(user_id: int, username: str):
     """Если прошло более 2 часов с последней синхронизации, привести локальный баланс к сроку подписки.
     1 руб = 6 часов. Баланс округляется вниз до целых рублей.
@@ -350,6 +380,91 @@ def start_command(message):
     # Иначе показываем главное меню
     show_main_menu(message)
 
+@bot.message_handler(commands=['admin'])
+def admin_entry(message):
+    """Вход в админ-панель по паролю."""
+    chat_id = message.chat.id
+    if not ADMIN_PASSWORD:
+        bot.send_message(chat_id, f"{EMOJI['warning']} Админ-пароль не задан. Установите ENV ADMIN_PASSWORD.")
+        return
+    msg = bot.send_message(chat_id, f"{EMOJI['lock']} Введите пароль администратора:")
+    bot.register_next_step_handler(msg, _admin_check_password)
+
+def _admin_check_password(message):
+    if message.text.strip() == ADMIN_PASSWORD:
+        _show_admin_menu(message)
+    else:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Неверный пароль.")
+
+def _show_admin_menu(message):
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        types.InlineKeyboardButton("➕ Начислить баланс", callback_data='admin_grant'),
+        types.InlineKeyboardButton("🚫 Блокировать пользователя", callback_data='admin_block'),
+        types.InlineKeyboardButton("✅ Разблокировать пользователя", callback_data='admin_unblock'),
+        types.InlineKeyboardButton("🎫 Создать промокод", callback_data='admin_create_promo')
+    )
+    bot.send_message(message.chat.id, f"{EMOJI['settings']} Админ-панель:", reply_markup=kb)
+
+def _admin_prompt_grant(message):
+    msg = bot.send_message(message.chat.id, "Введите: user_id сумма_в_рублях")
+    bot.register_next_step_handler(msg, _admin_do_grant)
+
+def _admin_do_grant(message):
+    try:
+        parts = message.text.strip().split()
+        uid = int(parts[0]); amount = int(parts[1])
+        credit_balance(uid, amount, reason='admin_grant')
+        bot.send_message(message.chat.id, f"Готово. Пользователю {uid} начислено {amount} ₽.")
+    except Exception:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Формат: user_id сумма")
+
+def _admin_prompt_block(message):
+    msg = bot.send_message(message.chat.id, "Введите user_id для блокировки")
+    bot.register_next_step_handler(msg, _admin_do_block)
+
+def _admin_do_block(message):
+    try:
+        uid = int(message.text.strip())
+        update_user_record(uid, {"blocked": True})
+        bot.send_message(message.chat.id, f"Пользователь {uid} заблокирован.")
+        try:
+            bot.send_message(uid, f"{EMOJI['lock']} Ваш доступ ограничен администратором.")
+        except Exception:
+            pass
+    except Exception:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Ошибка. Введите корректный user_id")
+
+def _admin_prompt_unblock(message):
+    msg = bot.send_message(message.chat.id, "Введите user_id для разблокировки")
+    bot.register_next_step_handler(msg, _admin_do_unblock)
+
+def _admin_do_unblock(message):
+    try:
+        uid = int(message.text.strip())
+        update_user_record(uid, {"blocked": False})
+        bot.send_message(message.chat.id, f"Пользователь {uid} разблокирован.")
+        try:
+            bot.send_message(uid, f"{EMOJI['unlock']} Доступ восстановлен.")
+        except Exception:
+            pass
+    except Exception:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Ошибка. Введите корректный user_id")
+
+def _admin_prompt_create_promo(message):
+    msg = bot.send_message(message.chat.id, "Введите промокод и сумму: CODE сумма")
+    bot.register_next_step_handler(msg, _admin_do_create_promo)
+
+def _admin_do_create_promo(message):
+    try:
+        parts = message.text.strip().split()
+        code = parts[0].upper(); amount = int(parts[1])
+        _save_promo(code, amount)
+        bot.send_message(message.chat.id, f"Промокод {code} на {amount} ₽ создан.")
+    except Exception:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Формат: CODE сумма")
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback(call):
     """Обработчик всех callback запросов"""
@@ -414,6 +529,14 @@ def handle_callback(call):
     elif call.data == 'show_qr_key':
         if ensure_username_or_prompt(fake_message):
             show_qr_key(fake_message)
+    elif call.data == 'admin_grant':
+        _admin_prompt_grant(fake_message)
+    elif call.data == 'admin_block':
+        _admin_prompt_block(fake_message)
+    elif call.data == 'admin_unblock':
+        _admin_prompt_unblock(fake_message)
+    elif call.data == 'admin_create_promo':
+        _admin_prompt_create_promo(fake_message)
     elif call.data.startswith("get_link_"):
         username = call.data.replace("get_link_", "")
         show_vpn_links(fake_message, username)
@@ -1545,22 +1668,29 @@ def activate_coupon(message):
     """Активация купона"""
     keyboard = types.InlineKeyboardMarkup()
     keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="balance"))
-    
-    text = f"""
-{EMOJI['coupon']} <b>Активация купона</b>
+    msg = None
+    try:
+        msg = bot.edit_message_text(
+            f"{EMOJI['coupon']} <b>Активация купона</b>\n\nОтправьте промокод текстом в чат.",
+            message.chat.id,
+            message.message_id,
+            parse_mode='HTML',
+            reply_markup=keyboard
+        )
+    except Exception:
+        msg = bot.send_message(message.chat.id, f"{EMOJI['coupon']} Отправьте промокод текстом.")
+    if msg:
+        bot.register_next_step_handler(msg, _handle_coupon_text)
 
-{EMOJI['info']} <b>Отправьте промокод для активации</b>
-
-{EMOJI['warning']} <b>Функция в разработке</b>
-"""
-    
-    bot.edit_message_text(
-        text,
-        message.chat.id,
-        message.message_id,
-        parse_mode='HTML',
-        reply_markup=keyboard
-    )
+def _handle_coupon_text(message):
+    code = (message.text or '').strip().upper()
+    if not code:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Пустой код.")
+        return
+    if _redeem_promo(message.from_user.id, code):
+        bot.send_message(message.chat.id, f"{EMOJI['check']} Промокод {code} активирован!")
+    else:
+        bot.send_message(message.chat.id, f"{EMOJI['cross']} Неверный или использованный промокод.")
 
 def share_referral_link(message):
     """Поделиться реферальной ссылкой"""
