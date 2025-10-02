@@ -41,6 +41,7 @@ DB_NAME = config('DB_NAME', default='marzban')
 DB_USER = config('DB_USER', default='marzban')
 DB_PASSWORD = config('DB_PASSWORD', default='DcR92D5bNArCjVTpakf')
 ADMIN_PASSWORD = config('ADMIN_PASSWORD', default='')
+ADMIN_USER_ID = config('ADMIN_USER_ID', default=7610842643, cast=int)
 
 # Создание бота
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -409,6 +410,10 @@ def start_command(message):
 def admin_entry(message):
     """Вход в админ-панель по паролю."""
     chat_id = message.chat.id
+    # Разрешен только владельцу
+    if message.from_user.id != ADMIN_USER_ID:
+        bot.send_message(chat_id, f"{EMOJI['cross']} Неизвестная команда. Если нужен доступ — напишите в поддержку @icewhipe")
+        return
     if not ADMIN_PASSWORD:
         bot.send_message(chat_id, f"{EMOJI['warning']} Админ-пароль не задан. Установите ENV ADMIN_PASSWORD.")
         return
@@ -416,7 +421,7 @@ def admin_entry(message):
     bot.register_next_step_handler(msg, _admin_check_password)
 
 def _admin_check_password(message):
-    if message.text.strip() == ADMIN_PASSWORD:
+    if message.text.strip() == ADMIN_PASSWORD and message.from_user.id == ADMIN_USER_ID:
         _show_admin_menu(message)
     else:
         bot.send_message(message.chat.id, f"{EMOJI['cross']} Неверный пароль.")
@@ -1873,6 +1878,17 @@ def subs_command(message):
 def invite_command(message):
     """Обработчик команды /invite"""
     show_invite_menu(message)
+
+@bot.message_handler(func=lambda m: True, content_types=['text', 'audio', 'document', 'photo', 'sticker', 'video', 'video_note', 'voice', 'location', 'contact', 'new_chat_members', 'left_chat_member', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo', 'group_chat_created', 'supergroup_chat_created', 'channel_chat_created', 'migrate_to_chat_id', 'migrate_from_chat_id', 'pinned_message'])
+def fallback_handler(message):
+    try:
+        # Игнорируем, если это было системное событие без текста
+        if getattr(message, 'text', None) and message.text.startswith('/'):
+            bot.send_message(message.chat.id, f"{EMOJI['cross']} Неизвестная команда. Наберите /start или напишите в поддержку @icewhipe")
+        else:
+            bot.send_message(message.chat.id, f"{EMOJI['info']} Если возникли вопросы — напишите в поддержку @icewhipe или наберите /start")
+    except Exception:
+        pass
 
 if __name__ == "__main__":
     logger.info("Запуск бота...")
