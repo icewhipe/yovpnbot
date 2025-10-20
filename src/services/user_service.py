@@ -197,6 +197,7 @@ class UserService:
         return {
             'user_id': user.user_id,
             'username': user.username,
+            'balance': user.balance_rub,  # Для совместимости с daily_payment_service
             'balance_rub': user.balance_rub,
             'days_remaining': user.days_from_balance(),
             'referrals_count': len(user.referrals),
@@ -205,3 +206,46 @@ class UserService:
             'created_at': user.created_at,
             'updated_at': user.updated_at
         }
+    
+    def update_user_balance(self, user_id: int, new_balance: float) -> bool:
+        """Обновить баланс пользователя"""
+        with self.data_lock:
+            data = self._load_data()
+            users = data.get("users", {})
+            user_key = str(user_id)
+            
+            if user_key not in users:
+                return False
+            
+            users[user_key]['balance_rub'] = max(0, new_balance)
+            users[user_key]['updated_at'] = datetime.now().isoformat()
+            
+            return self._save_data(data)
+    
+    def add_balance(self, user_id: int, amount: float) -> bool:
+        """Добавить средства на баланс пользователя"""
+        with self.data_lock:
+            data = self._load_data()
+            users = data.get("users", {})
+            user_key = str(user_id)
+            
+            if user_key not in users:
+                return False
+            
+            current_balance = users[user_key].get('balance_rub', 0)
+            users[user_key]['balance_rub'] = current_balance + amount
+            users[user_key]['updated_at'] = datetime.now().isoformat()
+            
+            return self._save_data(data)
+    
+    def get_balance(self, user_id: int) -> float:
+        """Получить баланс пользователя"""
+        user = self.get_user_record(user_id)
+        if not user:
+            return 0.0
+        return user.balance_rub
+    
+    def days_from_balance(self, user_id: int) -> int:
+        """Вычислить количество дней доступа исходя из баланса (4 рубля в день)"""
+        balance = self.get_balance(user_id)
+        return int(balance / 4)  # 4 рубля в день

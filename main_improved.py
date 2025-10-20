@@ -19,6 +19,8 @@ from telebot import types
 from src.config import config
 from src.services.user_service import UserService
 from src.services.marzban_service import MarzbanService
+from src.services.daily_payment_service import DailyPaymentService
+from src.services.notification_service import NotificationService
 from src.models.user import User
 
 # Опциональная поддержка генерации QR-кодов
@@ -38,9 +40,16 @@ logger = logging.getLogger(__name__)
 # Создание сервисов
 user_service = UserService()
 marzban_service = MarzbanService()
+notification_service = NotificationService()
 
 # Создание бота
 bot = telebot.TeleBot(config.BOT_TOKEN)
+
+# Устанавливаем бота в сервис уведомлений
+notification_service.set_bot(bot)
+
+# Создание сервиса ежедневной оплаты
+daily_payment_service = DailyPaymentService(marzban_service, user_service)
 
 # Список пользователей, которые уже получили тестовый период
 test_users = set()
@@ -123,10 +132,13 @@ def start_command(message):
     except Exception as e:
         logger.warning(f"Не удалось обработать реферальный параметр: {e}")
     
-    # Приветственный бонус 20 ₽ (однократно)
+    # Приветственный бонус 20 ₽ (однократно) - 5 дней доступа
     if not user.bonus_given:
-        user_service.credit_balance(user_id, 20, reason='welcome_bonus')
+        user_service.add_balance(user_id, 20)
         user_service.update_user_record(user_id, {"bonus_given": True})
+        
+        # Отправляем уведомление о приветственном бонусе
+        notification_service.send_welcome_bonus_notification(user_id, 20, 20)
     
     # Если это самый первый /start — показываем приветствие с кнопкой настройки
     if not user.first_start_completed:
