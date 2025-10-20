@@ -31,10 +31,11 @@ async def handle_settings(callback: CallbackQuery, **kwargs):
         ui_service = services.get_ui_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         settings = user.get('settings', {})
         notifications = settings.get('notifications', True)
@@ -89,10 +90,11 @@ async def handle_settings_notifications(callback: CallbackQuery, **kwargs):
         user_service = services.get_user_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         # Переключаем уведомления
         settings = user.get('settings', {})
@@ -137,10 +139,11 @@ async def handle_settings_auto_renewal(callback: CallbackQuery, **kwargs):
         user_service = services.get_user_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         # Переключаем автопродление
         settings = user.get('settings', {})

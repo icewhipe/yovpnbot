@@ -202,10 +202,11 @@ async def handle_my_balance(callback: CallbackQuery, **kwargs):
         ui_service = services.get_ui_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         balance = user.get('balance', 0.0)
         total_payments = user.get('total_payments', 0.0)
