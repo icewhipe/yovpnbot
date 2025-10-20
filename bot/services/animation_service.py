@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from aiogram import Bot
 from aiogram.types import Message
 
-from assets.animations.effects import MESSAGE_EFFECTS, get_effect_id, get_usage_example
+from assets.animations.effects import MESSAGE_EFFECTS, get_effect_id, get_usage_example, get_fallback_emoji
 
 logger = logging.getLogger(__name__)
 
@@ -199,9 +199,23 @@ class AnimationService:
             effect_id = get_effect_id(effect_name)
             
             if effect_id:
-                kwargs['message_effect_id'] = effect_id
-            
-            return await message.reply(text, **kwargs)
+                # Сначала пробуем отправить с эффектом
+                try:
+                    kwargs_with_effect = kwargs.copy()
+                    kwargs_with_effect['message_effect_id'] = effect_id
+                    return await message.reply(text, **kwargs_with_effect)
+                except Exception as effect_error:
+                    # Если эффект не работает, добавляем fallback эмодзи и отправляем без эффекта
+                    fallback_emoji = get_fallback_emoji(effect_name)
+                    enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
+                    logger.warning(f"⚠️ Эффект '{effect_name}' недоступен: {effect_error}. Используем fallback эмодзи.")
+                    return await message.reply(enhanced_text, **kwargs)
+            else:
+                # Если эффект не найден, добавляем fallback эмодзи
+                fallback_emoji = get_fallback_emoji(effect_name)
+                enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
+                logger.warning(f"⚠️ Эффект '{effect_name}' не найден. Используем fallback эмодзи.")
+                return await message.reply(enhanced_text, **kwargs)
             
         except Exception as e:
             logger.error(f"❌ Ошибка отправки сообщения с эффектом: {e}")
@@ -225,9 +239,23 @@ class AnimationService:
             effect_id = get_effect_id(effect_name)
             
             if effect_id:
-                kwargs['message_effect_id'] = effect_id
-            
-            return await self.bot.send_message(chat_id, text, **kwargs)
+                # Сначала пробуем отправить с эффектом
+                try:
+                    kwargs_with_effect = kwargs.copy()
+                    kwargs_with_effect['message_effect_id'] = effect_id
+                    return await self.bot.send_message(chat_id, text, **kwargs_with_effect)
+                except Exception as effect_error:
+                    # Если эффект не работает, добавляем fallback эмодзи и отправляем без эффекта
+                    fallback_emoji = get_fallback_emoji(effect_name)
+                    enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
+                    logger.warning(f"⚠️ Эффект '{effect_name}' недоступен: {effect_error}. Используем fallback эмодзи.")
+                    return await self.bot.send_message(chat_id, enhanced_text, **kwargs)
+            else:
+                # Если эффект не найден, добавляем fallback эмодзи
+                fallback_emoji = get_fallback_emoji(effect_name)
+                enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
+                logger.warning(f"⚠️ Эффект '{effect_name}' не найден. Используем fallback эмодзи.")
+                return await self.bot.send_message(chat_id, enhanced_text, **kwargs)
             
         except Exception as e:
             logger.error(f"❌ Ошибка отправки сообщения с эффектом: {e}")
