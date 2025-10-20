@@ -417,7 +417,411 @@ def show_balance_menu(message):
         reply_markup=keyboard
     )
 
-# Добавлю остальные функции...
+@handle_error
+def show_my_subscriptions(message):
+    """Показать подписки пользователя"""
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.first_name or "user"
+    
+    # Получаем информацию о пользователе из Marzban
+    user_info = marzban_service.get_user_info(username)
+    
+    if not user_info:
+        text = f"{EMOJI['subscription']} <b>Мои подписки</b>\n\n{EMOJI['warning']} У вас нет активных подписок"
+    else:
+        # Формируем информацию о подписке
+        status_emoji = EMOJI.get('active', '🟢') if user_info.get('status') == 'active' else EMOJI.get('expired', '🔴')
+        text = f"{EMOJI['subscription']} <b>Мои подписки</b>\n\n{status_emoji} <b>Статус:</b> {user_info.get('status', 'Неизвестно')}\n{EMOJI['device']} <b>Устройства:</b> {user_info.get('used_traffic', 0)}/{user_info.get('data_limit', 'Безлимит')}"
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_invite_menu(message):
+    """Показать меню приглашения друзей"""
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.first_name or "user"
+    
+    # Получаем статистику рефералов
+    user_stats = user_service.get_user_stats(user_id)
+    referrals_count = user_stats.get('referrals_count', 0)
+    referral_income = user_stats.get('referral_income', 0)
+    
+    # Создаем реферальную ссылку
+    bot_username = bot.get_me().username
+    referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    
+    text = f"""
+{EMOJI['referral']} <b>Пригласите друзей и получайте бонусы!</b>
+
+{EMOJI['info']} <b>Как это работает:</b>
+• Отправьте другу вашу реферальную ссылку
+• Друг переходит по ссылке и регистрируется
+• Вы получаете 12 ₽ на баланс
+• Друг получает 20 ₽ приветственный бонус
+
+{EMOJI['link']} <b>Ваша реферальная ссылка:</b>
+<code>{referral_link}</code>
+
+{EMOJI['stats']} <b>Ваша статистика:</b>
+• Приглашено друзей: {referrals_count}
+• Заработано с рефералов: {referral_income} ₽
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton(f"{EMOJI['share']} Поделиться", callback_data="share_link"),
+        types.InlineKeyboardButton(f"{EMOJI['qr']} QR-код", callback_data="show_qr")
+    )
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_referrals_menu(message):
+    """Показать меню рефералов"""
+    user_id = message.from_user.id
+    user_stats = user_service.get_user_stats(user_id)
+    referrals_count = user_stats.get('referrals_count', 0)
+    referral_income = user_stats.get('referral_income', 0)
+    
+    text = f"""
+{EMOJI['referral']} <b>Мои рефералы</b>
+
+{EMOJI['stats']} <b>Статистика:</b>
+• Приглашено друзей: {referrals_count}
+• Заработано с рефералов: {referral_income} ₽
+
+{EMOJI['info']} <b>Как приглашать:</b>
+1. Поделитесь реферальной ссылкой
+2. Друг переходит по ссылке
+3. Вы получаете 12 ₽ бонус
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_about_service(message):
+    """Показать информацию о сервисе"""
+    text = f"""
+{EMOJI['info']} <b>О сервисе YoVPN</b>
+
+{EMOJI['speed']} <b>Высокая скорость</b>
+Серверы в 50+ странах мира
+
+{EMOJI['security']} <b>Безопасность</b>
+Военный уровень шифрования
+
+{EMOJI['no_logs']} <b>Без логов</b>
+Мы не храним ваши данные
+
+{EMOJI['active']} <b>Стабильность</b>
+Работаем 24/7 без перебоев
+
+{EMOJI['device']} <b>Устройства</b>
+До 3 устройств одновременно
+
+{EMOJI['support']} <b>Поддержка</b>
+Круглосуточная помощь
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_payment_options(message):
+    """Показать варианты пополнения"""
+    text = f"""
+{EMOJI['payment']} <b>Пополнение баланса</b>
+
+{EMOJI['info']} <b>Доступные способы:</b>
+• Банковская карта
+• СБП (Система быстрых платежей)
+• Криптовалюта
+• Электронные кошельки
+
+{EMOJI['warning']} <b>Внимание:</b> Функция в разработке
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="balance"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_payment_history(message):
+    """Показать историю платежей"""
+    text = f"""
+{EMOJI['history']} <b>История платежей</b>
+
+{EMOJI['warning']} <b>Внимание:</b> Функция в разработке
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="balance"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def activate_coupon(message):
+    """Активация купона"""
+    text = f"""
+{EMOJI['coupon']} <b>Активация купона</b>
+
+{EMOJI['warning']} <b>Внимание:</b> Функция в разработке
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="balance"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def share_referral_link(message):
+    """Поделиться реферальной ссылкой"""
+    user_id = message.from_user.id
+    bot_username = bot.get_me().username
+    referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    
+    text = f"""
+{EMOJI['share']} <b>Поделиться реферальной ссылкой</b>
+
+{EMOJI['link']} <b>Ваша ссылка:</b>
+<code>{referral_link}</code>
+
+{EMOJI['info']} <b>Как поделиться:</b>
+1. Скопируйте ссылку выше
+2. Отправьте другу в любом мессенджере
+3. Друг переходит по ссылке
+4. Вы получаете 12 ₽ бонус
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="invite_friend"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_qr_code(message):
+    """Показать QR-код реферальной ссылки"""
+    user_id = message.from_user.id
+    bot_username = bot.get_me().username
+    referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+    
+    if QR_AVAILABLE:
+        try:
+            # Генерируем QR-код
+            qr = qrcode.QRCode(version=1, box_size=10, border=5)
+            qr.add_data(referral_link)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Конвертируем в BytesIO
+            bio = BytesIO()
+            img.save(bio, 'PNG')
+            bio.seek(0)
+            
+            # Отправляем QR-код
+            bot.send_photo(
+                message.chat.id,
+                photo=bio,
+                caption=f"{EMOJI['qr']} <b>QR-код реферальной ссылки</b>\n\n{EMOJI['info']} Поделитесь этим QR-кодом с друзьями!",
+                parse_mode='HTML'
+            )
+            return
+        except Exception as e:
+            logger.warning(f"Ошибка генерации QR-кода: {e}")
+    
+    # Если QR-код не удалось сгенерировать, показываем ссылку
+    text = f"""
+{EMOJI['qr']} <b>QR-код реферальной ссылки</b>
+
+{EMOJI['link']} <b>Ваша ссылка:</b>
+<code>{referral_link}</code>
+
+{EMOJI['info']} <b>Как использовать:</b>
+1. Поделитесь QR-кодом с друзьями
+2. Друг сканирует QR-код
+3. Вы получаете 12 ₽ бонус
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="invite_friend"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_support_chat(message):
+    """Показать контакты поддержки"""
+    text = f"""
+{EMOJI['support']} <b>Поддержка</b>
+
+{EMOJI['info']} <b>Способы связи:</b>
+• Telegram: @yovpn_support
+• Email: support@yovpn.com
+• Время работы: 24/7
+
+{EMOJI['warning']} <b>Внимание:</b> Функция в разработке
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def show_channel_link(message):
+    """Показать ссылку на канал"""
+    text = f"""
+{EMOJI['channel']} <b>Наш канал</b>
+
+{EMOJI['info']} <b>Подписывайтесь на наш канал:</b>
+• Новости и обновления
+• Полезные советы
+• Специальные предложения
+
+{EMOJI['warning']} <b>Внимание:</b> Функция в разработке
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+# Заглушки для остальных функций
+@handle_error
+def get_test_period(message, username):
+    """Получить тестовый период"""
+    bot.send_message(message.chat.id, f"{EMOJI['gift']} <b>Тестовый период</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def handle_subscription_purchase(message, callback_data):
+    """Обработка покупки подписки"""
+    bot.send_message(message.chat.id, f"{EMOJI['subscription']} <b>Покупка подписки</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def show_setup_step1(message):
+    """Показать первый шаг настройки"""
+    bot.send_message(message.chat.id, f"{EMOJI['settings']} <b>Настройка VPN</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def show_setup_step2(message, device_key):
+    """Показать второй шаг настройки"""
+    bot.send_message(message.chat.id, f"{EMOJI['settings']} <b>Настройка VPN</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def continue_setup_flow(message):
+    """Продолжить настройку"""
+    bot.send_message(message.chat.id, f"{EMOJI['settings']} <b>Настройка VPN</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def finish_setup(message):
+    """Завершить настройку"""
+    bot.send_message(message.chat.id, f"{EMOJI['settings']} <b>Настройка VPN</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def show_qr_key(message):
+    """Показать QR-код ключа"""
+    bot.send_message(message.chat.id, f"{EMOJI['qr']} <b>QR-код ключа</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def show_vpn_links(message, username):
+    """Показать VPN ссылки"""
+    bot.send_message(message.chat.id, f"{EMOJI['vpn']} <b>VPN ссылки</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def show_vless_links(message, username):
+    """Показать VLESS ссылки"""
+    bot.send_message(message.chat.id, f"{EMOJI['vpn']} <b>VLESS ссылки</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def show_subscription_link(message, username):
+    """Показать ссылку подписки"""
+    bot.send_message(message.chat.id, f"{EMOJI['subscription']} <b>Ссылка подписки</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def copy_vless_link(message, callback_data):
+    """Скопировать VLESS ссылку"""
+    bot.send_message(message.chat.id, f"{EMOJI['vpn']} <b>Копирование ссылки</b>\n\n{EMOJI['warning']} Функция в разработке")
+
+@handle_error
+def get_vless_configs(message, username):
+    """Получить VLESS конфигурации"""
+    bot.send_message(message.chat.id, f"{EMOJI['vpn']} <b>VLESS конфигурации</b>\n\n{EMOJI['warning']} Функция в разработке")
 
 if __name__ == "__main__":
     logger.info("Запуск улучшенного бота...")

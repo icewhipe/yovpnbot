@@ -29,7 +29,7 @@ class Config:
         self.DB_PASSWORD = config('DB_PASSWORD', default=None)
         
         # Data file path
-        self.DATA_FILE = config('DATA_FILE', default='/workspace/data.json')
+        self.DATA_FILE = config('DATA_FILE', default='data.json')
         
         # Validate required configuration
         self._validate_config()
