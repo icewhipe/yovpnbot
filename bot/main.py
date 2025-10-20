@@ -27,7 +27,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # Импорты конфигурации и сервисов
 from src.config import config
-from bot.handlers import register_handlers
+from bot.handlers import register_handlers, init_admin_panel
 from bot.middleware import register_middleware
 from bot.services import BotServices
 
@@ -65,6 +65,13 @@ class YoVPNBot:
         # Регистрируем middleware и обработчики
         register_middleware(self.dp)
         register_handlers(self.dp)
+        
+        # Инициализируем админ панель
+        init_admin_panel(
+            self.services.user_service,
+            self.services.marzban_service,
+            self.services.ui_service
+        )
         
         logger.info("YoVPN Bot инициализирован")
     

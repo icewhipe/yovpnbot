@@ -6,7 +6,7 @@
 import logging
 from aiogram import Dispatcher
 from aiogram.types import CallbackQuery
-from aiogram.filters import Text
+from aiogram import F
 
 from assets.emojis.interface import EMOJI
 
@@ -291,9 +291,9 @@ def register_callback_handler(dp: Dispatcher):
     Args:
         dp: Диспетчер бота
     """
-    dp.callback_query.register(handle_main_menu, Text("main_menu"))
-    dp.callback_query.register(handle_stats, Text("stats"))
-    dp.callback_query.register(handle_referrals, Text("referrals"))
-    dp.callback_query.register(handle_instructions, Text("instructions"))
+    dp.callback_query.register(handle_main_menu, F.data == "main_menu")
+    dp.callback_query.register(handle_stats, F.data == "stats")
+    dp.callback_query.register(handle_referrals, F.data == "referrals")
+    dp.callback_query.register(handle_instructions, F.data == "instructions")
     
     logger.info("✅ Обработчики callback запросов зарегистрированы")

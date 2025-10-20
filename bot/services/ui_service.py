@@ -26,6 +26,11 @@ class UIService:
         """Инициализация сервиса"""
         logger.info("✅ UIService инициализирован")
     
+    def get_current_time(self) -> str:
+        """Получить текущее время в формате строки"""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     def create_main_menu_keyboard(self) -> InlineKeyboardMarkup:
         """
         Создать клавиатуру главного меню

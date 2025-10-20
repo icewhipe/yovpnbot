@@ -6,7 +6,7 @@
 import logging
 from aiogram import Dispatcher
 from aiogram.types import CallbackQuery, Message
-from aiogram.filters import Text
+from aiogram import F
 
 from assets.emojis.interface import EMOJI
 
@@ -200,8 +200,8 @@ def register_support_handler(dp: Dispatcher):
     Args:
         dp: Диспетчер бота
     """
-    dp.callback_query.register(handle_support, Text("support"))
-    dp.callback_query.register(handle_faq, Text("faq"))
-    dp.callback_query.register(handle_contact_support, Text("contact_support"))
+    dp.callback_query.register(handle_support, F.data == "support")
+    dp.callback_query.register(handle_faq, F.data == "faq")
+    dp.callback_query.register(handle_contact_support, F.data == "contact_support")
     
     logger.info("✅ Обработчики поддержки зарегистрированы")

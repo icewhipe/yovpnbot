@@ -6,7 +6,7 @@
 import logging
 from aiogram import Dispatcher
 from aiogram.types import CallbackQuery, Message
-from aiogram.filters import Text
+from aiogram import F
 
 from assets.emojis.interface import EMOJI
 
@@ -228,9 +228,9 @@ def register_settings_handler(dp: Dispatcher):
     Args:
         dp: Диспетчер бота
     """
-    dp.callback_query.register(handle_settings, Text("settings"))
-    dp.callback_query.register(handle_settings_notifications, Text("settings_notifications"))
-    dp.callback_query.register(handle_settings_auto_renewal, Text("settings_auto_renewal"))
-    dp.callback_query.register(handle_about_bot, Text("about_bot"))
+    dp.callback_query.register(handle_settings, F.data == "settings")
+    dp.callback_query.register(handle_settings_notifications, F.data == "settings_notifications")
+    dp.callback_query.register(handle_settings_auto_renewal, F.data == "settings_auto_renewal")
+    dp.callback_query.register(handle_about_bot, F.data == "about_bot")
     
     logger.info("✅ Обработчики настроек зарегистрированы")
