@@ -82,6 +82,18 @@ def get_effect_id(effect_name: str) -> str:
     """
     return MESSAGE_EFFECTS.get(effect_name, {}).get('id', '')
 
+def get_fallback_emoji(effect_name: str) -> str:
+    """
+    Получить fallback эмодзи для эффекта
+    
+    Args:
+        effect_name: Название эффекта
+    
+    Returns:
+        str: Эмодзи для использования вместо эффекта
+    """
+    return MESSAGE_EFFECTS.get(effect_name, {}).get('fallback_emoji', '')
+
 def get_effect_info(effect_name: str) -> dict:
     """
     Получить полную информацию об эффекте
