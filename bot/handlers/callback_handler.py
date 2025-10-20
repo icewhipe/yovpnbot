@@ -32,10 +32,11 @@ async def handle_main_menu(callback: CallbackQuery, **kwargs):
         ui_service = services.get_ui_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         # Получаем статистику
         stats = await user_service.get_user_stats(user_id)
@@ -90,10 +91,11 @@ async def handle_stats(callback: CallbackQuery, **kwargs):
         ui_service = services.get_ui_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         # Получаем статистику
         stats = await user_service.get_user_stats(user_id)
@@ -159,10 +161,11 @@ async def handle_referrals(callback: CallbackQuery, **kwargs):
         ui_service = services.get_ui_service()
         
         # Получаем данные пользователя
-        user = await user_service.get_user(user_id)
-        if not user:
-            await callback.answer("❌ Пользователь не найден", show_alert=True)
-            return
+        user = await user_service.get_or_create_user(
+            user_id=user_id,
+            username=callback.from_user.username,
+            first_name=callback.from_user.first_name or "Пользователь"
+        )
         
         # Получаем статистику рефералов
         stats = await user_service.get_user_stats(user_id)

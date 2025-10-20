@@ -114,6 +114,24 @@ class UserService:
         """
         return self.users.get(user_id)
     
+    async def get_or_create_user(self, user_id: int, username: Optional[str] = None, first_name: str = "Пользователь") -> Dict[str, Any]:
+        """
+        Получить пользователя или создать нового, если его нет
+        
+        Args:
+            user_id: ID пользователя
+            username: Имя пользователя в Telegram
+            first_name: Имя пользователя
+        
+        Returns:
+            Dict: Данные пользователя
+        """
+        user = await self.get_user(user_id)
+        if not user:
+            user = await self.create_or_update_user(user_id, username, first_name)
+            logger.info(f"👤 Пользователь {user_id} создан автоматически")
+        return user
+    
     async def update_user_balance(self, user_id: int, amount: float, operation: str = "add") -> bool:
         """
         Обновить баланс пользователя
