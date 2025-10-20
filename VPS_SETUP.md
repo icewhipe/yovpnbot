@@ -36,6 +36,9 @@ cp .env.example .env
 
 # Редактируем конфигурацию
 nano .env
+
+# ВАЖНО: НЕ ТРОГАЙТЕ файлы config.py и subscription.py - это файлы Marzban!
+# Работайте только с файлами в src/ и main_improved.py
 ```
 
 **Содержимое .env файла:**
