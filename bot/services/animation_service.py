@@ -199,9 +199,19 @@ class AnimationService:
             effect_id = get_effect_id(effect_name)
             
             if effect_id:
-                kwargs['message_effect_id'] = effect_id
-            
-            return await message.reply(text, **kwargs)
+                # Сначала пробуем отправить с эффектом
+                try:
+                    kwargs_with_effect = kwargs.copy()
+                    kwargs_with_effect['message_effect_id'] = effect_id
+                    return await message.reply(text, **kwargs_with_effect)
+                except Exception as effect_error:
+                    # Если эффект не работает, отправляем без него
+                    logger.warning(f"⚠️ Эффект '{effect_name}' недоступен: {effect_error}")
+                    return await message.reply(text, **kwargs)
+            else:
+                # Если эффект не найден, отправляем без него
+                logger.warning(f"⚠️ Эффект '{effect_name}' не найден")
+                return await message.reply(text, **kwargs)
             
         except Exception as e:
             logger.error(f"❌ Ошибка отправки сообщения с эффектом: {e}")
@@ -225,9 +235,19 @@ class AnimationService:
             effect_id = get_effect_id(effect_name)
             
             if effect_id:
-                kwargs['message_effect_id'] = effect_id
-            
-            return await self.bot.send_message(chat_id, text, **kwargs)
+                # Сначала пробуем отправить с эффектом
+                try:
+                    kwargs_with_effect = kwargs.copy()
+                    kwargs_with_effect['message_effect_id'] = effect_id
+                    return await self.bot.send_message(chat_id, text, **kwargs_with_effect)
+                except Exception as effect_error:
+                    # Если эффект не работает, отправляем без него
+                    logger.warning(f"⚠️ Эффект '{effect_name}' недоступен: {effect_error}")
+                    return await self.bot.send_message(chat_id, text, **kwargs)
+            else:
+                # Если эффект не найден, отправляем без него
+                logger.warning(f"⚠️ Эффект '{effect_name}' не найден")
+                return await self.bot.send_message(chat_id, text, **kwargs)
             
         except Exception as e:
             logger.error(f"❌ Ошибка отправки сообщения с эффектом: {e}")
