@@ -12,7 +12,7 @@ from assets.emojis.interface import EMOJI, get_emoji_combination
 
 logger = logging.getLogger(__name__)
 
-async def start_command(message: Message):
+async def start_command(message: Message, **kwargs):
     """
     Обработчик команды /start
     
@@ -21,6 +21,7 @@ async def start_command(message: Message):
     
     Args:
         message: Сообщение от пользователя
+        **kwargs: Дополнительные данные, включая services из middleware
     """
     user_id = message.from_user.id
     first_name = message.from_user.first_name or "Пользователь"
@@ -28,10 +29,10 @@ async def start_command(message: Message):
     
     logger.info(f"👋 Новый пользователь: ID={user_id}, Username=@{username}, Name={first_name}")
     
-    # Получаем сервисы из контекста
-    services = message.bot.get("services")
+    # Получаем сервисы из middleware
+    services = kwargs.get("services")
     if not services:
-        logger.error("❌ Сервисы не найдены в контексте бота")
+        logger.error("❌ Сервисы не найдены в middleware")
         await message.reply("❌ Ошибка инициализации. Попробуйте позже.")
         return
     

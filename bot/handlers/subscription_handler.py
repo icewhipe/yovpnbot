@@ -12,7 +12,7 @@ from assets.emojis.interface import EMOJI, get_emoji_combination
 
 logger = logging.getLogger(__name__)
 
-async def handle_my_subscriptions(callback: CallbackQuery):
+async def handle_my_subscriptions(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "Мои подписки"
     
@@ -22,7 +22,7 @@ async def handle_my_subscriptions(callback: CallbackQuery):
     
     try:
         # Получаем сервисы из контекста
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -68,7 +68,7 @@ async def handle_my_subscriptions(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_my_subscriptions: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_activate_subscription(callback: CallbackQuery):
+async def handle_activate_subscription(callback: CallbackQuery, **kwargs):
     """
     Обработчик активации подписки
     
@@ -78,7 +78,7 @@ async def handle_activate_subscription(callback: CallbackQuery):
     
     try:
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -134,7 +134,7 @@ async def handle_activate_subscription(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_activate_subscription: {e}")
         await callback.answer("❌ Произошла ошибка при активации", show_alert=True)
 
-async def handle_setup_vpn(callback: CallbackQuery):
+async def handle_setup_vpn(callback: CallbackQuery, **kwargs):
     """
     Обработчик настройки VPN
     
@@ -179,7 +179,7 @@ async def handle_setup_vpn(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_setup_vpn: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_copy_config(callback: CallbackQuery):
+async def handle_copy_config(callback: CallbackQuery, **kwargs):
     """
     Обработчик копирования конфигурации
     
@@ -189,7 +189,7 @@ async def handle_copy_config(callback: CallbackQuery):
     
     try:
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return

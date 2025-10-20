@@ -12,7 +12,7 @@ from assets.emojis.interface import EMOJI
 
 logger = logging.getLogger(__name__)
 
-async def handle_settings(callback: CallbackQuery):
+async def handle_settings(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "Настройки"
     
@@ -22,7 +22,7 @@ async def handle_settings(callback: CallbackQuery):
     
     try:
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -71,7 +71,7 @@ async def handle_settings(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_settings: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_settings_notifications(callback: CallbackQuery):
+async def handle_settings_notifications(callback: CallbackQuery, **kwargs):
     """
     Обработчик настройки уведомлений
     
@@ -81,7 +81,7 @@ async def handle_settings_notifications(callback: CallbackQuery):
     
     try:
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -119,7 +119,7 @@ async def handle_settings_notifications(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_settings_notifications: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_settings_auto_renewal(callback: CallbackQuery):
+async def handle_settings_auto_renewal(callback: CallbackQuery, **kwargs):
     """
     Обработчик настройки автопродления
     
@@ -129,7 +129,7 @@ async def handle_settings_auto_renewal(callback: CallbackQuery):
     
     try:
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -167,7 +167,7 @@ async def handle_settings_auto_renewal(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_settings_auto_renewal: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_about_bot(callback: CallbackQuery):
+async def handle_about_bot(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "О боте"
     
