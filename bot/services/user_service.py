@@ -1,0 +1,298 @@
+"""
+Сервис пользователей
+Управление пользователями, их данными и статистикой
+"""
+
+import json
+import logging
+from typing import Optional, Dict, Any
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+class UserService:
+    """
+    Сервис для работы с пользователями
+    
+    Отвечает за:
+    - Создание и обновление пользователей
+    - Управление балансом и подписками
+    - Статистику и аналитику
+    - Сохранение данных в файл
+    """
+    
+    def __init__(self, data_file: str = "data.json"):
+        """
+        Инициализация сервиса
+        
+        Args:
+            data_file: Путь к файлу с данными
+        """
+        self.data_file = Path(data_file)
+        self.users = self._load_users()
+        logger.info(f"✅ UserService инициализирован, загружено {len(self.users)} пользователей")
+    
+    def _load_users(self) -> Dict[int, Dict[str, Any]]:
+        """
+        Загрузить пользователей из файла
+        
+        Returns:
+            Dict: Словарь пользователей
+        """
+        try:
+            if self.data_file.exists():
+                with open(self.data_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки пользователей: {e}")
+            return {}
+    
+    def _save_users(self):
+        """Сохранить пользователей в файл"""
+        try:
+            with open(self.data_file, 'w', encoding='utf-8') as f:
+                json.dump(self.users, f, ensure_ascii=False, indent=2)
+            logger.debug("💾 Пользователи сохранены")
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения пользователей: {e}")
+    
+    async def create_or_update_user(self, user_id: int, username: Optional[str], first_name: str) -> Dict[str, Any]:
+        """
+        Создать или обновить пользователя
+        
+        Args:
+            user_id: ID пользователя
+            username: Имя пользователя в Telegram
+            first_name: Имя пользователя
+        
+        Returns:
+            Dict: Данные пользователя
+        """
+        if user_id not in self.users:
+            # Создаем нового пользователя
+            self.users[user_id] = {
+                'user_id': user_id,
+                'username': username,
+                'first_name': first_name,
+                'balance': 0.0,
+                'subscription_active': False,
+                'subscription_days': 0,
+                'total_payments': 0.0,
+                'referrals': [],
+                'referral_code': f"ref_{user_id}",
+                'created_at': self._get_current_timestamp(),
+                'last_activity': self._get_current_timestamp(),
+                'settings': {
+                    'notifications': True,
+                    'auto_renewal': True,
+                    'language': 'ru'
+                }
+            }
+            logger.info(f"👤 Создан новый пользователь: {first_name} (ID: {user_id})")
+        else:
+            # Обновляем существующего пользователя
+            self.users[user_id].update({
+                'username': username,
+                'first_name': first_name,
+                'last_activity': self._get_current_timestamp()
+            })
+            logger.debug(f"👤 Обновлен пользователь: {first_name} (ID: {user_id})")
+        
+        self._save_users()
+        return self.users[user_id]
+    
+    async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Получить данные пользователя
+        
+        Args:
+            user_id: ID пользователя
+        
+        Returns:
+            Optional[Dict]: Данные пользователя или None
+        """
+        return self.users.get(user_id)
+    
+    async def update_user_balance(self, user_id: int, amount: float, operation: str = "add") -> bool:
+        """
+        Обновить баланс пользователя
+        
+        Args:
+            user_id: ID пользователя
+            amount: Сумма
+            operation: Операция (add, subtract, set)
+        
+        Returns:
+            bool: Успешность операции
+        """
+        if user_id not in self.users:
+            logger.warning(f"⚠️ Пользователь {user_id} не найден")
+            return False
+        
+        user = self.users[user_id]
+        current_balance = user.get('balance', 0.0)
+        
+        if operation == "add":
+            new_balance = current_balance + amount
+        elif operation == "subtract":
+            new_balance = max(0, current_balance - amount)
+        elif operation == "set":
+            new_balance = amount
+        else:
+            logger.error(f"❌ Неизвестная операция: {operation}")
+            return False
+        
+        user['balance'] = round(new_balance, 2)
+        self._save_users()
+        
+        logger.info(f"💰 Баланс пользователя {user_id}: {current_balance} → {new_balance}")
+        return True
+    
+    async def get_user_balance(self, user_id: int) -> float:
+        """
+        Получить баланс пользователя
+        
+        Args:
+            user_id: ID пользователя
+        
+        Returns:
+            float: Баланс пользователя
+        """
+        user = await self.get_user(user_id)
+        return user.get('balance', 0.0) if user else 0.0
+    
+    async def calculate_days_from_balance(self, user_id: int, daily_cost: float = 4.0) -> int:
+        """
+        Рассчитать количество дней из баланса
+        
+        Args:
+            user_id: ID пользователя
+            daily_cost: Стоимость дня
+        
+        Returns:
+            int: Количество дней
+        """
+        balance = await self.get_user_balance(user_id)
+        return int(balance / daily_cost)
+    
+    async def activate_subscription(self, user_id: int, days: int) -> bool:
+        """
+        Активировать подписку пользователя
+        
+        Args:
+            user_id: ID пользователя
+            days: Количество дней
+        
+        Returns:
+            bool: Успешность активации
+        """
+        if user_id not in self.users:
+            return False
+        
+        user = self.users[user_id]
+        user['subscription_active'] = True
+        user['subscription_days'] = days
+        user['subscription_started'] = self._get_current_timestamp()
+        
+        self._save_users()
+        logger.info(f"✅ Подписка активирована для пользователя {user_id}: {days} дней")
+        return True
+    
+    async def deactivate_subscription(self, user_id: int) -> bool:
+        """
+        Деактивировать подписку пользователя
+        
+        Args:
+            user_id: ID пользователя
+        
+        Returns:
+            bool: Успешность деактивации
+        """
+        if user_id not in self.users:
+            return False
+        
+        user = self.users[user_id]
+        user['subscription_active'] = False
+        user['subscription_days'] = 0
+        
+        self._save_users()
+        logger.info(f"❌ Подписка деактивирована для пользователя {user_id}")
+        return True
+    
+    async def get_user_stats(self, user_id: int) -> Dict[str, Any]:
+        """
+        Получить статистику пользователя
+        
+        Args:
+            user_id: ID пользователя
+        
+        Returns:
+            Dict: Статистика пользователя
+        """
+        user = await self.get_user(user_id)
+        if not user:
+            return {}
+        
+        return {
+            'balance': user.get('balance', 0.0),
+            'subscription_active': user.get('subscription_active', False),
+            'subscription_days': user.get('subscription_days', 0),
+            'total_payments': user.get('total_payments', 0.0),
+            'referrals_count': len(user.get('referrals', [])),
+            'created_at': user.get('created_at'),
+            'last_activity': user.get('last_activity')
+        }
+    
+    async def add_referral(self, user_id: int, referred_user_id: int) -> bool:
+        """
+        Добавить реферала
+        
+        Args:
+            user_id: ID пользователя, который пригласил
+            referred_user_id: ID приглашенного пользователя
+        
+        Returns:
+            bool: Успешность добавления
+        """
+        if user_id not in self.users:
+            return False
+        
+        user = self.users[user_id]
+        referrals = user.get('referrals', [])
+        
+        if referred_user_id not in referrals:
+            referrals.append(referred_user_id)
+            user['referrals'] = referrals
+            self._save_users()
+            
+            # Начисляем бонус за реферала
+            await self.update_user_balance(user_id, 20.0, "add")
+            
+            logger.info(f"🎁 Добавлен реферал: {user_id} → {referred_user_id}")
+            return True
+        
+        return False
+    
+    def _get_current_timestamp(self) -> str:
+        """Получить текущую временную метку"""
+        from datetime import datetime
+        return datetime.now().isoformat()
+    
+    async def get_all_users(self) -> Dict[int, Dict[str, Any]]:
+        """
+        Получить всех пользователей
+        
+        Returns:
+            Dict: Все пользователи
+        """
+        return self.users.copy()
+    
+    async def get_users_count(self) -> int:
+        """
+        Получить количество пользователей
+        
+        Returns:
+            int: Количество пользователей
+        """
+        return len(self.users)
