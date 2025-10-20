@@ -10,8 +10,8 @@ from typing import Optional, Dict, List
 import logging
 import urllib3
 
-# Отключаем SSL предупреждения
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Включаем SSL проверку для безопасности
+# urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,8 @@ class MarzbanAPI:
         self.timeout = timeout
         self.session = requests.Session()
         
-        # Отключаем SSL проверку для локального API
-        self.session.verify = False
+        # Включаем SSL проверку для безопасности
+        self.session.verify = True
         
         if admin_token:
             self.session.headers.update({
