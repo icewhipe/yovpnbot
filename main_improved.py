@@ -220,7 +220,10 @@ def handle_callback(call):
         'share_referral': lambda m: share_referral_link(m),
         'referral_stats': lambda m: show_referrals_menu(m),
         'custom_top_up': show_payment_options,
-        'help': show_about_service
+        'help': show_about_service,
+        # Новые обработчики платежей
+        'simulate_payment': lambda m: handle_simulate_payment(m, 0),  # Будет переопределено в callback
+        'process_payment': lambda m: handle_real_payment(m, 'card', 0)  # Будет переопределено в callback
     }
     
     # Обработка callback'ов с параметрами
@@ -263,6 +266,16 @@ def handle_callback(call):
         payment_method = call.data.split("_")[1]  # card, sbp, bank, wallet
         amount = int(call.data.split("_")[2])
         handle_payment_method(fake_message, payment_method, amount)
+    elif call.data.startswith("simulate_payment_"):
+        # Симуляция платежа (только для демо)
+        amount = int(call.data.replace("simulate_payment_", ""))
+        handle_simulate_payment(fake_message, amount)
+    elif call.data.startswith("process_payment_"):
+        # Обработка реального платежа (заглушка)
+        parts = call.data.split("_")
+        payment_method = parts[2]
+        amount = int(parts[3])
+        handle_real_payment(fake_message, payment_method, amount)
     else:
         # Обработка простых callback'ов
         handler = callback_handlers.get(call.data)
@@ -431,6 +444,137 @@ def show_subscription_options(message):
 {EMOJI['security']} <b>Безопасность:</b> Военный уровень
 {EMOJI['no_logs']} <b>Логи:</b> Не ведем
 """
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def handle_payment_method(message, payment_method, amount):
+    """Обработать выбор способа оплаты"""
+    user_id = message.from_user.id
+    days = int(amount / 4)
+    
+    # Показываем информацию о выбранном способе оплаты
+    payment_info = {
+        'card': {
+            'name': '💳 Банковская карта',
+            'description': 'Оплата банковской картой через безопасный шлюз',
+            'processing_time': 'Мгновенно'
+        },
+        'sbp': {
+            'name': '📱 СБП',
+            'description': 'Система быстрых платежей через мобильное приложение банка',
+            'processing_time': 'Мгновенно'
+        },
+        'bank': {
+            'name': '🏦 Банковский перевод',
+            'description': 'Перевод на расчетный счет организации',
+            'processing_time': '1-3 рабочих дня'
+        },
+        'wallet': {
+            'name': '💰 Электронные кошельки',
+            'description': 'Оплата через Яндекс.Деньги, Qiwi, WebMoney и другие',
+            'processing_time': 'Мгновенно'
+        }
+    }
+    
+    info = payment_info.get(payment_method, payment_info['card'])
+    
+    text = f"""
+{info['name']} <b>Способ оплаты выбран</b>
+
+💰 <b>Сумма к оплате:</b> {amount} ₽
+📅 <b>Доступно дней:</b> {days}
+⏱️ <b>Время обработки:</b> {info['processing_time']}
+
+{info['description']}
+
+⚠️ <b>Внимание!</b> Это демо-версия бота.
+В реальной версии здесь будет:
+• Генерация ссылки на оплату
+• Интеграция с платежным шлюзом
+• Проверка статуса платежа
+• Автоматическое зачисление средств
+
+<b>Для тестирования:</b>
+Нажмите "Симулировать оплату" для демонстрации
+"""
+    
+    # Создаем клавиатуру
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        types.InlineKeyboardButton("🔗 Перейти к оплате", callback_data=f"process_payment_{payment_method}_{amount}"),
+        types.InlineKeyboardButton("🧪 Симулировать оплату (ДЕМО)", callback_data=f"simulate_payment_{amount}")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("⬅️ Выбрать другой способ", callback_data="balance"),
+        types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")
+    )
+    
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
+
+@handle_error
+def handle_simulate_payment(message, amount):
+    """Симулировать оплату (только для демо)"""
+    user_id = message.from_user.id
+    days = int(amount / 4)
+    
+    # Показываем анимацию платежа
+    sticker_service.animate_payment_process(message.chat.id, amount)
+    
+    # В ДЕМО-РЕЖИМЕ добавляем средства (только для тестирования)
+    user_service.add_balance(user_id, amount)
+    
+    # Отправляем уведомление об успехе
+    sticker_service.send_celebration(
+        message.chat.id, 
+        f"🎉 ДЕМО: Баланс пополнен на {amount} ₽! Доступно {days} дней"
+    )
+    
+    # Показываем обновленную информацию о балансе
+    show_balance_menu(message)
+
+@handle_error
+def handle_real_payment(message, payment_method, amount):
+    """Обработать реальный платеж (заглушка)"""
+    user_id = message.from_user.id
+    days = int(amount / 4)
+    
+    text = f"""
+🔗 <b>Переход к оплате</b>
+
+💰 <b>Сумма:</b> {amount} ₽
+📅 <b>Доступно дней:</b> {days}
+💳 <b>Способ:</b> {payment_method.upper()}
+
+⚠️ <b>Внимание!</b> Это демо-версия.
+
+<b>В реальной версии здесь будет:</b>
+• 🔗 Ссылка на платежный шлюз
+• 📱 QR-код для мобильной оплаты
+• 🏦 Реквизиты для банковского перевода
+• 📧 Email с инструкциями
+
+<b>Для тестирования используйте:</b>
+"Симулировать оплату" в предыдущем меню
+"""
+    
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        types.InlineKeyboardButton("⬅️ Назад к способам оплаты", callback_data="balance"),
+        types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main")
+    )
     
     bot.edit_message_text(
         text,
