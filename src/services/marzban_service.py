@@ -43,6 +43,7 @@ class MarzbanService:
         url = f"{self.api_url}{endpoint}"
         
         try:
+            logger.debug(f"Выполняем запрос: {method} {url}")
             response = self.session.request(method, url, **kwargs)
             
             # Логируем запрос для отладки
@@ -54,10 +55,13 @@ class MarzbanService:
                 logger.info(f"Ресурс не найден: {endpoint}")
                 return None
             elif response.status_code == 401:
-                logger.error("Ошибка авторизации в Marzban API")
+                logger.error(f"Ошибка авторизации в Marzban API. URL: {url}")
+                logger.error(f"Токен: {self.admin_token[:10]}..." if self.admin_token else "Токен не установлен")
+                logger.error(f"Ответ сервера: {response.text}")
                 return None
             elif response.status_code == 403:
-                logger.error("Доступ запрещен в Marzban API")
+                logger.error(f"Доступ запрещен в Marzban API. URL: {url}")
+                logger.error(f"Ответ сервера: {response.text}")
                 return None
             else:
                 logger.warning(f"Ошибка API {endpoint}: {response.status_code} - {response.text}")
@@ -265,8 +269,16 @@ class MarzbanService:
     def health_check(self) -> bool:
         """Проверка доступности API"""
         try:
+            logger.info(f"Проверяем доступность Marzban API: {self.api_url}")
+            logger.info(f"Используем токен: {self.admin_token[:10]}..." if self.admin_token else "Токен не установлен")
+            
             result = self._make_request('GET', '/system')
-            return result is not None
+            if result:
+                logger.info("Marzban API доступен")
+                return True
+            else:
+                logger.warning("Marzban API недоступен")
+                return False
         except Exception as e:
             logger.error(f"Ошибка проверки здоровья API: {e}")
             return False
