@@ -235,6 +235,22 @@ def show_main_menu(message):
     
     # Проверяем, есть ли у пользователя подписка
     user_info = marzban_service.get_user_info(username) if username else None
+    
+    # Если пользователь не найден в Marzban, создаем его
+    if not user_info and username:
+        logger.info(f"Пользователь {username} не найден в Marzban, создаем...")
+        try:
+            # Создаем пользователя с тестовым периодом на 7 дней
+            created_user = marzban_service.create_test_user(username, user_id)
+            if created_user:
+                logger.info(f"Пользователь {username} успешно создан в Marzban")
+                # Получаем информацию о созданном пользователе
+                user_info = marzban_service.get_user_info(username)
+            else:
+                logger.warning(f"Не удалось создать пользователя {username} в Marzban")
+        except Exception as e:
+            logger.error(f"Ошибка создания пользователя {username}: {e}")
+    
     is_new_user = user_id not in test_users
     
     # Получаем статистику пользователя
@@ -471,7 +487,7 @@ def show_invite_menu(message):
 {EMOJI['link']} <b>Ваша реферальная ссылка:</b>
 <code>{referral_link}</code>
 
-{EMOJI['stats']} <b>Ваша статистика:</b>
+{EMOJI['info']} <b>Ваша статистика:</b>
 • Приглашено друзей: {referrals_count}
 • Заработано с рефералов: {referral_income} ₽
 """
@@ -502,7 +518,7 @@ def show_referrals_menu(message):
     text = f"""
 {EMOJI['referral']} <b>Мои рефералы</b>
 
-{EMOJI['stats']} <b>Статистика:</b>
+{EMOJI['info']} <b>Статистика:</b>
 • Приглашено друзей: {referrals_count}
 • Заработано с рефералов: {referral_income} ₽
 
