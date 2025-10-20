@@ -48,9 +48,6 @@ class ServicesMiddleware(BaseMiddleware):
         # Добавляем сервисы в данные события
         data["services"] = self._services
         
-        # Добавляем сервисы в контекст бота
-        bot["services"] = self._services
-        
         # Вызываем следующий обработчик
         return await handler(event, data)
     

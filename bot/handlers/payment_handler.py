@@ -12,7 +12,7 @@ from assets.emojis.interface import EMOJI, format_balance
 
 logger = logging.getLogger(__name__)
 
-async def handle_top_up(callback: CallbackQuery):
+async def handle_top_up(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "Пополнить"
     
@@ -21,8 +21,8 @@ async def handle_top_up(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     try:
-        # Получаем сервисы
-        services = callback.bot.get("services")
+        # Получаем сервисы из middleware
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -61,7 +61,7 @@ async def handle_top_up(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_top_up: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_payment_amount(callback: CallbackQuery):
+async def handle_payment_amount(callback: CallbackQuery, **kwargs):
     """
     Обработчик выбора суммы платежа
     
@@ -75,7 +75,7 @@ async def handle_payment_amount(callback: CallbackQuery):
         amount = float(callback_data.replace("pay_", ""))
         
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -101,7 +101,7 @@ async def handle_payment_amount(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_payment_amount: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_payment_method(callback: CallbackQuery):
+async def handle_payment_method(callback: CallbackQuery, **kwargs):
     """
     Обработчик выбора способа оплаты
     
@@ -115,7 +115,7 @@ async def handle_payment_method(callback: CallbackQuery):
         method = callback_data.replace("pay_method_", "")
         
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -183,7 +183,7 @@ async def handle_payment_method(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_payment_method: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_my_balance(callback: CallbackQuery):
+async def handle_my_balance(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "Мой баланс"
     
@@ -193,7 +193,7 @@ async def handle_my_balance(callback: CallbackQuery):
     
     try:
         # Получаем сервисы
-        services = callback.bot.get("services")
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return

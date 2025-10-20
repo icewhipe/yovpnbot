@@ -12,7 +12,7 @@ from assets.emojis.interface import EMOJI
 
 logger = logging.getLogger(__name__)
 
-async def handle_main_menu(callback: CallbackQuery):
+async def handle_main_menu(callback: CallbackQuery, **kwargs):
     """
     Обработчик возврата в главное меню
     
@@ -22,8 +22,8 @@ async def handle_main_menu(callback: CallbackQuery):
     first_name = callback.from_user.first_name or "Пользователь"
     
     try:
-        # Получаем сервисы
-        services = callback.bot.get("services")
+        # Получаем сервисы из middleware
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -71,7 +71,7 @@ async def handle_main_menu(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_main_menu: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_stats(callback: CallbackQuery):
+async def handle_stats(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "Статистика"
     
@@ -80,8 +80,8 @@ async def handle_stats(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     try:
-        # Получаем сервисы
-        services = callback.bot.get("services")
+        # Получаем сервисы из middleware
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
@@ -140,7 +140,7 @@ async def handle_stats(callback: CallbackQuery):
         logger.error(f"❌ Ошибка в handle_stats: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-async def handle_referrals(callback: CallbackQuery):
+async def handle_referrals(callback: CallbackQuery, **kwargs):
     """
     Обработчик кнопки "Рефералы"
     
@@ -149,8 +149,8 @@ async def handle_referrals(callback: CallbackQuery):
     user_id = callback.from_user.id
     
     try:
-        # Получаем сервисы
-        services = callback.bot.get("services")
+        # Получаем сервисы из middleware
+        services = kwargs.get("services")
         if not services:
             await callback.answer("❌ Сервисы недоступны", show_alert=True)
             return
