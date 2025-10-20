@@ -375,3 +375,8 @@ class UIService:
             progress_text = ""
         
         return f"🔄 {text}{progress_text}"
+    
+    def create_button_with_emoji(self, text: str, callback_data: str, button_type: str = "info") -> types.InlineKeyboardButton:
+        """Создать кнопку с эмодзи"""
+        emoji = self.button_emojis.get(button_type, "ℹ️")
+        return types.InlineKeyboardButton(f"{emoji} {text}", callback_data=callback_data)

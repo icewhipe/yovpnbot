@@ -25,35 +25,16 @@ class StickerService:
     
     def __init__(self, bot=None):
         self.bot = bot
+        # Временно отключаем стикеры из-за неправильных ID
+        # В реальной версии нужно использовать валидные ID стикеров
         self.stickers = {
-            'loading': [
-                'CAACAgIAAxkBAAIBY2Yx...',  # Загрузка 1
-                'CAACAgIAAxkBAAIBZGYx...',  # Загрузка 2
-            ],
-            'success': [
-                'CAACAgIAAxkBAAIBZWYx...',  # Успех 1
-                'CAACAgIAAxkBAAIBZmYx...',  # Успех 2
-            ],
-            'error': [
-                'CAACAgIAAxkBAAIBZ2Yx...',  # Ошибка 1
-                'CAACAgIAAxkBAAIBaGYx...',  # Ошибка 2
-            ],
-            'server': [
-                'CAACAgIAAxkBAAIBaWYx...',  # Сервер 1
-                'CAACAgIAAxkBAAIBamYx...',  # Сервер 2
-            ],
-            'security': [
-                'CAACAgIAAxkBAAIBa2Yx...',  # Безопасность 1
-                'CAACAgIAAxkBAAIBbGYx...',  # Безопасность 2
-            ],
-            'network': [
-                'CAACAgIAAxkBAAIBbWYx...',  # Сеть 1
-                'CAACAgIAAxkBAAIBbmYx...',  # Сеть 2
-            ],
-            'celebration': [
-                'CAACAgIAAxkBAAIBb2Yx...',  # Празднование 1
-                'CAACAgIAAxkBAAIBcGYx...',  # Празднование 2
-            ]
+            'loading': [],  # Пустой список - стикеры отключены
+            'success': [],
+            'error': [],
+            'server': [],
+            'security': [],
+            'network': [],
+            'celebration': []
         }
         
         # Эмодзи для прогресс-баров
@@ -81,8 +62,23 @@ class StickerService:
         
         sticker_id = self.get_sticker(category, index)
         if not sticker_id:
-            logger.warning(f"Стикер не найден: {category}[{index}]")
-            return False
+            # Если стикер не найден, отправляем эмодзи вместо стикера
+            emoji_map = {
+                'loading': '🔄',
+                'success': '✅',
+                'error': '❌',
+                'server': '🖥️',
+                'security': '🔐',
+                'network': '🌐',
+                'celebration': '🎉'
+            }
+            emoji = emoji_map.get(category, '📱')
+            try:
+                self.bot.send_message(chat_id, emoji)
+                return True
+            except Exception as e:
+                logger.error(f"Ошибка отправки эмодзи: {e}")
+                return False
         
         try:
             self.bot.send_sticker(chat_id, sticker_id)
