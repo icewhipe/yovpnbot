@@ -258,6 +258,11 @@ def handle_callback(call):
         # Быстрое пополнение
         amount = int(call.data.replace("quick_top_up_", ""))
         handle_quick_top_up(fake_message, amount)
+    elif call.data.startswith("pay_"):
+        # Обработка способов оплаты
+        payment_method = call.data.split("_")[1]  # card, sbp, bank, wallet
+        amount = int(call.data.split("_")[2])
+        handle_payment_method(fake_message, payment_method, amount)
     else:
         # Обработка простых callback'ов
         handler = callback_handlers.get(call.data)
@@ -984,20 +989,45 @@ def handle_quick_top_up(message, amount):
     user_id = message.from_user.id
     days = int(amount / 4)
     
-    # Показываем анимацию платежа
-    sticker_service.animate_payment_process(message.chat.id, amount)
+    # КРИТИЧЕСКАЯ УЯЗИВИМОСТЬ ИСПРАВЛЕНА!
+    # НЕ ДОБАВЛЯЕМ СРЕДСТВА БЕЗ РЕАЛЬНОГО ПЛАТЕЖА
     
-    # Добавляем средства на баланс
-    user_service.add_balance(user_id, amount)
+    # Показываем информацию о выбранной сумме
+    text = f"""
+💳 <b>Выбрана сумма: {amount} ₽</b>
+
+📅 <b>Доступно дней:</b> {days}
+💰 <b>Стоимость:</b> 4 ₽/день
+
+⚠️ <b>Внимание!</b> Это демо-режим. 
+В реальной версии здесь будет интеграция с платежной системой.
+
+<b>Доступные способы оплаты:</b>
+• 💳 Банковская карта
+• 📱 СБП (Система быстрых платежей)
+• 🏦 Банковский перевод
+• 💰 Электронные кошельки
+"""
     
-    # Отправляем уведомление об успехе
-    sticker_service.send_celebration(
-        message.chat.id, 
-        f"💰 Баланс пополнен на {amount} ₽! Доступно {days} дней"
+    # Создаем клавиатуру с реальными способами оплаты
+    keyboard = types.InlineKeyboardMarkup(row_width=1)
+    keyboard.add(
+        types.InlineKeyboardButton("💳 Оплатить картой", callback_data=f"pay_card_{amount}"),
+        types.InlineKeyboardButton("📱 СБП", callback_data=f"pay_sbp_{amount}"),
+        types.InlineKeyboardButton("🏦 Банковский перевод", callback_data=f"pay_bank_{amount}"),
+        types.InlineKeyboardButton("💰 Электронные кошельки", callback_data=f"pay_wallet_{amount}")
+    )
+    keyboard.add(
+        types.InlineKeyboardButton("⬅️ Назад к выбору суммы", callback_data="balance")
     )
     
-    # Показываем обновленную информацию о балансе
-    show_balance_menu(message)
+    bot.edit_message_text(
+        text,
+        message.chat.id,
+        message.message_id,
+        parse_mode='HTML',
+        reply_markup=keyboard
+    )
 
 if __name__ == "__main__":
     logger.info("Запуск улучшенного бота...")
