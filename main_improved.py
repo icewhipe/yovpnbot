@@ -19,6 +19,12 @@ from telebot import types
 from src.config import config
 from src.services.user_service import UserService
 from src.services.marzban_service import MarzbanService
+from src.services.daily_payment_service import DailyPaymentService
+from src.services.notification_service import NotificationService
+from src.services.animation_service import StickerService
+from src.services.ui_service import UIService
+from src.services.copy_service import CopyService
+from src.services.interaction_service import InteractionService
 from src.models.user import User
 
 # Опциональная поддержка генерации QR-кодов
@@ -38,9 +44,23 @@ logger = logging.getLogger(__name__)
 # Создание сервисов
 user_service = UserService()
 marzban_service = MarzbanService()
+notification_service = NotificationService()
+sticker_service = StickerService()
+ui_service = UIService()
+copy_service = CopyService()
+interaction_service = InteractionService()
 
 # Создание бота
 bot = telebot.TeleBot(config.BOT_TOKEN)
+
+# Устанавливаем бота во все сервисы
+notification_service.set_bot(bot)
+sticker_service.set_bot(bot)
+copy_service.set_bot(bot)
+interaction_service.set_bot(bot)
+
+# Создание сервиса ежедневной оплаты
+daily_payment_service = DailyPaymentService(marzban_service, user_service)
 
 # Список пользователей, которые уже получили тестовый период
 test_users = set()
@@ -123,10 +143,16 @@ def start_command(message):
     except Exception as e:
         logger.warning(f"Не удалось обработать реферальный параметр: {e}")
     
-    # Приветственный бонус 20 ₽ (однократно)
+    # Приветственный бонус 20 ₽ (однократно) - 5 дней доступа
     if not user.bonus_given:
-        user_service.credit_balance(user_id, 20, reason='welcome_bonus')
+        user_service.add_balance(user_id, 20)
         user_service.update_user_record(user_id, {"bonus_given": True})
+        
+        # Создаем анимацию приветственного бонуса
+        sticker_service.send_celebration(message.chat.id, "🎉 Добро пожаловать! Вам начислен приветственный бонус 20 ₽")
+        
+        # Отправляем уведомление о приветственном бонусе
+        notification_service.send_welcome_bonus_notification(user_id, 20, 20)
     
     # Если это самый первый /start — показываем приветствие с кнопкой настройки
     if not user.first_start_completed:
@@ -183,6 +209,18 @@ def handle_callback(call):
         'back_to_setup_1': show_setup_step1,
         'finish_setup': finish_setup,
         'show_qr_key': show_qr_key,
+        # Новые обработчики
+        'activate_subscription': lambda m: get_test_period(m, m.from_user.username),
+        'extend_subscription': show_payment_options,
+        'subscription_settings': lambda m: show_my_subscriptions(m),
+        'copy_subscription_link': lambda m: handle_copy_request(m, "subscription"),
+        'show_subscription_qr': lambda m: handle_qr_request(m, "subscription"),
+        'copy_referral_link': lambda m: handle_copy_request(m, "referral"),
+        'show_referral_qr': lambda m: handle_qr_request(m, "referral"),
+        'share_referral': lambda m: share_referral_link(m),
+        'referral_stats': lambda m: show_referrals_menu(m),
+        'custom_top_up': show_payment_options,
+        'help': show_about_service
     }
     
     # Обработка callback'ов с параметрами
@@ -208,15 +246,37 @@ def handle_callback(call):
     elif call.data.startswith("get_configs_"):
         username = call.data.replace("get_configs_", "")
         get_vless_configs(fake_message, username)
+    elif call.data.startswith("copy_"):
+        # Обработка копирования
+        copy_type = call.data.replace("copy_", "")
+        handle_copy_request(fake_message, copy_type)
+    elif call.data.startswith("qr_"):
+        # Обработка QR-кодов
+        qr_type = call.data.replace("qr_", "")
+        handle_qr_request(fake_message, qr_type)
+    elif call.data.startswith("quick_top_up_"):
+        # Быстрое пополнение
+        amount = int(call.data.replace("quick_top_up_", ""))
+        handle_quick_top_up(fake_message, amount)
     else:
         # Обработка простых callback'ов
         handler = callback_handlers.get(call.data)
         if handler:
             handler(fake_message)
     
-    # Отвечаем на callback query
+    # Отвечаем на callback query с улучшенной обратной связью
     try:
-        bot.answer_callback_query(call.id)
+        # Показываем обратную связь в зависимости от типа действия
+        if call.data.startswith("copy_"):
+            interaction_service.show_loading_feedback(call.id, "Подготавливаем для копирования...")
+        elif call.data.startswith("qr_"):
+            interaction_service.show_loading_feedback(call.id, "Генерируем QR-код...")
+        elif call.data.startswith("quick_top_up_"):
+            interaction_service.show_loading_feedback(call.id, "Обрабатываем платеж...")
+        elif call.data in ["activate_subscription", "extend_subscription"]:
+            interaction_service.show_loading_feedback(call.id, "Активируем подписку...")
+        else:
+            bot.answer_callback_query(call.id)
     except Exception as e:
         logger.warning(f"Ошибка ответа на callback query: {e}")
 
@@ -240,14 +300,21 @@ def show_main_menu(message):
     if not user_info and username:
         logger.info(f"Пользователь {username} не найден в Marzban, создаем...")
         try:
-            # Создаем пользователя с тестовым периодом на 7 дней
-            created_user = marzban_service.create_test_user(username, user_id)
-            if created_user:
-                logger.info(f"Пользователь {username} успешно создан в Marzban")
-                # Получаем информацию о созданном пользователе
-                user_info = marzban_service.get_user_info(username)
+            # Получаем баланс пользователя
+            user_stats = user_service.get_user_stats(user_id)
+            balance = user_stats.get('balance', 0)
+            
+            if balance >= 4:  # Если есть средства на 1 день
+                # Создаем пользователя с подпиской на 1 день
+                created_user = marzban_service.create_user(username, user_id, days=1)
+                if created_user:
+                    logger.info(f"Пользователь {username} успешно создан в Marzban с подпиской на 1 день")
+                    # Получаем информацию о созданном пользователе
+                    user_info = marzban_service.get_user_info(username)
+                else:
+                    logger.warning(f"Не удалось создать пользователя {username} в Marzban")
             else:
-                logger.warning(f"Не удалось создать пользователя {username} в Marzban")
+                logger.info(f"Недостаточно средств для создания подписки у пользователя {username}")
         except Exception as e:
             logger.error(f"Ошибка создания пользователя {username}: {e}")
     
@@ -256,47 +323,17 @@ def show_main_menu(message):
     # Получаем статистику пользователя
     user_stats = user_service.get_user_stats(user_id)
     
-    # Создаем клавиатуру главного меню
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    
-    if user_info:
-        # Пользователь с подпиской
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['add']} Продлить подписку", callback_data="add_subscription"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
-    elif is_new_user:
-        # Новый пользователь
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['gift']} Получить тестовый период", callback_data=f"get_test_{username}"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
-    else:
-        # Пользователь уже получал тест
-        keyboard.add(
-            types.InlineKeyboardButton(f"{EMOJI['add']} Купить подписку", callback_data="add_subscription"),
-            types.InlineKeyboardButton(f"{EMOJI['subscription']} Мои подписки", callback_data="my_subscriptions")
-        )
-    
-    # Вторая строка: Баланс (длинная кнопка)
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['balance']} Баланс", callback_data="balance")
-    )
-    
-    # Третья строка: Пригласить друга и Мои рефералы
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['referral']} Пригласить друга", callback_data="invite_friend"),
-        types.InlineKeyboardButton(f"{EMOJI['referral']} Мои рефералы", callback_data="my_referrals")
-    )
-    
-    # Четвертая строка: О сервисе (длинная кнопка)
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['info']} О сервисе", callback_data="about_service")
-    )
+    # Создаем улучшенную клавиатуру главного меню
+    has_subscription = user_info and user_info.get('status') == 'active'
+    keyboard = ui_service.create_main_menu_keyboard(user_stats, has_subscription)
     
     # Формируем текст приветствия
-    balance = user_stats.get('balance_rub', 0)
+    balance = user_stats.get('balance', 0)
     days = user_stats.get('days_remaining', 0)
+    
+    # Проверяем статус подписки
+    subscription_status = "Активна" if user_info and user_info.get('status') == 'active' else "Неактивна"
+    subscription_emoji = "🟢" if user_info and user_info.get('status') == 'active' else "🔴"
     
     if user_info:
         # Пользователь с подпиской
@@ -307,7 +344,8 @@ def show_main_menu(message):
 ├ ID: {user_id}
 ├ Username: @{username}
 ├ Баланс: {balance} ₽ (≈ {days} дн.)
-└ Подписок: 1
+├ Подписка: {subscription_emoji} {subscription_status}
+└ Стоимость: 4 ₽/день
 
 {EMOJI['rocket']} <b>Выберите действие:</b>
 """
@@ -317,13 +355,14 @@ def show_main_menu(message):
 {EMOJI['user']} <b>Добро пожаловать, {first_name}!</b>
 
 {EMOJI['gift']} <b>Подарок для новых пользователей!</b>
-Вы получили 7 дней бесплатного доступа к VPN
+Вы получили 20 ₽ на баланс (5 дней доступа)
 
 <b>Ваш профиль:</b>
 ├ ID: {user_id}
 ├ Username: @{username}
 ├ Баланс: {balance} ₽ (≈ {days} дн.)
-└ Подписок: 0
+├ Подписка: 🔴 Неактивна
+└ Стоимость: 4 ₽/день
 
 {EMOJI['rocket']} <b>Выберите действие:</b>
 """
@@ -401,29 +440,16 @@ def show_subscription_options(message):
 @handle_error
 def show_balance_menu(message):
     """Показать меню баланса"""
-    keyboard = types.InlineKeyboardMarkup(row_width=1)
-    
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['payment']} Пополнить баланс", callback_data="top_up_balance"),
-        types.InlineKeyboardButton(f"{EMOJI['history']} История пополнения", callback_data="payment_history"),
-        types.InlineKeyboardButton(f"{EMOJI['coupon']} Активировать купон", callback_data="activate_coupon"),
-        types.InlineKeyboardButton(f"{EMOJI['back']} Вернуться в личный кабинет", callback_data="back_to_main")
-    )
-    
     # Получаем актуальный баланс
     user_stats = user_service.get_user_stats(message.from_user.id)
-    balance = user_stats.get('balance_rub', 0)
+    balance = user_stats.get('balance', 0)
     days = user_stats.get('days_remaining', 0)
     
-    text = f"""
-{EMOJI['balance']} <b>Баланс:</b> {balance} ₽  (≈ {days} дн.)
-
-{EMOJI['info']} <b>Доступные действия:</b>
-
-{EMOJI['payment']} <b>Пополнить баланс</b> — Добавить средства на счет
-{EMOJI['history']} <b>История пополнения</b> — Посмотреть транзакции
-{EMOJI['coupon']} <b>Активировать купон</b> — Ввести промокод
-"""
+    # Создаем улучшенную клавиатуру
+    keyboard = ui_service.create_balance_keyboard(balance)
+    
+    # Формируем текст с улучшенным форматированием
+    text = ui_service.format_balance_message(balance, days)
     
     bot.edit_message_text(
         text,
@@ -442,15 +468,20 @@ def show_my_subscriptions(message):
     # Получаем информацию о пользователе из Marzban
     user_info = marzban_service.get_user_info(username)
     
-    if not user_info:
-        text = f"{EMOJI['subscription']} <b>Мои подписки</b>\n\n{EMOJI['warning']} У вас нет активных подписок"
-    else:
-        # Формируем информацию о подписке
-        status_emoji = EMOJI.get('active', '🟢') if user_info.get('status') == 'active' else EMOJI.get('expired', '🔴')
-        text = f"{EMOJI['subscription']} <b>Мои подписки</b>\n\n{status_emoji} <b>Статус:</b> {user_info.get('status', 'Неизвестно')}\n{EMOJI['device']} <b>Устройства:</b> {user_info.get('used_traffic', 0)}/{user_info.get('data_limit', 'Безлимит')}"
+    # Получаем статистику пользователя
+    user_stats = user_service.get_user_stats(user_id)
+    balance = user_stats.get('balance', 0)
+    days_remaining = user_stats.get('days_remaining', 0)
     
-    keyboard = types.InlineKeyboardMarkup(row_width=1)
-    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
+    # Формируем информацию о подписке
+    subscription_info = {
+        'status': user_info.get('status', 'inactive') if user_info else 'inactive',
+        'days_remaining': days_remaining,
+        'balance': balance
+    }
+    
+    text = ui_service.format_subscription_message(subscription_info)
+    keyboard = ui_service.create_subscription_keyboard(subscription_info)
     
     bot.edit_message_text(
         text,
@@ -475,29 +506,26 @@ def show_invite_menu(message):
     bot_username = bot.get_me().username
     referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
     
+    # Создаем улучшенную клавиатуру
+    keyboard = ui_service.create_referral_keyboard(referral_link)
+    
     text = f"""
-{EMOJI['referral']} <b>Пригласите друзей и получайте бонусы!</b>
+👥 <b>Пригласите друзей и получайте бонусы!</b>
 
-{EMOJI['info']} <b>Как это работает:</b>
+ℹ️ <b>Как это работает:</b>
 • Отправьте другу вашу реферальную ссылку
 • Друг переходит по ссылке и регистрируется
-• Вы получаете 12 ₽ на баланс
-• Друг получает 20 ₽ приветственный бонус
+• Вы получаете 12 ₽ на баланс (3 дня)
+• Друг получает 20 ₽ приветственный бонус (5 дней)
 
-{EMOJI['link']} <b>Ваша реферальная ссылка:</b>
+🔗 <b>Ваша реферальная ссылка:</b>
 <code>{referral_link}</code>
 
-{EMOJI['info']} <b>Ваша статистика:</b>
+📊 <b>Ваша статистика:</b>
 • Приглашено друзей: {referrals_count}
 • Заработано с рефералов: {referral_income} ₽
+• Доступно дней: {int(referral_income / 4)}
 """
-    
-    keyboard = types.InlineKeyboardMarkup(row_width=2)
-    keyboard.add(
-        types.InlineKeyboardButton(f"{EMOJI['share']} Поделиться", callback_data="share_link"),
-        types.InlineKeyboardButton(f"{EMOJI['qr']} QR-код", callback_data="show_qr")
-    )
-    keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
     
     bot.edit_message_text(
         text,
@@ -782,7 +810,56 @@ def show_channel_link(message):
 @handle_error
 def get_test_period(message, username):
     """Получить тестовый период"""
-    bot.send_message(message.chat.id, f"{EMOJI['gift']} <b>Тестовый период</b>\n\n{EMOJI['warning']} Функция в разработке")
+    user_id = message.from_user.id
+    
+    # Получаем статистику пользователя
+    user_stats = user_service.get_user_stats(user_id)
+    balance = user_stats.get('balance', 0)
+    
+    if balance >= 4:  # Если есть средства на 1 день
+        # Создаем анимацию активации подписки
+        days = int(balance / 4)
+        sticker_service.animate_subscription_activation(message.chat.id, days)
+        
+        # Создаем пользователя в Marzban с подпиской на 1 день
+        try:
+            created_user = marzban_service.create_user(username, user_id, days=1)
+            if created_user:
+                # Отправляем праздничную анимацию
+                sticker_service.send_celebration(
+                    message.chat.id, 
+                    f"🎉 Подписка активирована! Доступно {days} дней"
+                )
+                
+                # Отправляем уведомление о возобновлении подписки
+                notification_service.send_subscription_reactivated_notification(user_id, balance)
+            else:
+                interaction_service.create_error_animation(
+                    message.chat.id, 
+                    "Не удалось создать подписку. Попробуйте позже."
+                )
+        except Exception as e:
+            logger.error(f"Ошибка создания подписки для {username}: {e}")
+            interaction_service.create_error_animation(
+                message.chat.id, 
+                "Произошла ошибка при создании подписки."
+            )
+    else:
+        # Показываем предупреждение с анимацией
+        interaction_service.create_warning_feedback(
+            message.chat.id, 
+            "Недостаточно средств для активации подписки"
+        )
+        
+        text = f"""
+⚠️ <b>Недостаточно средств</b>
+
+💰 <b>Ваш баланс:</b> {balance} ₽
+💳 <b>Требуется:</b> 4 ₽ (1 день)
+
+Пополните баланс для активации подписки.
+"""
+        bot.send_message(message.chat.id, text, parse_mode='HTML')
 
 @handle_error
 def handle_subscription_purchase(message, callback_data):
@@ -839,12 +916,109 @@ def get_vless_configs(message, username):
     """Получить VLESS конфигурации"""
     bot.send_message(message.chat.id, f"{EMOJI['vpn']} <b>VLESS конфигурации</b>\n\n{EMOJI['warning']} Функция в разработке")
 
+@handle_error
+def handle_copy_request(message, copy_type):
+    """Обработать запрос на копирование"""
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.first_name or "user"
+    
+    # Получаем информацию о пользователе
+    user_info = marzban_service.get_user_info(username)
+    
+    if copy_type == "vless" and user_info:
+        # Копирование VLESS ссылки
+        vless_link = user_info.get('links', [{}])[0].get('link', '')
+        if vless_link:
+            copy_service.handle_copy_request(message.chat.id, vless_link, "vless")
+        else:
+            bot.send_message(message.chat.id, "❌ VLESS ссылка не найдена")
+    elif copy_type == "subscription" and user_info:
+        # Копирование Subscription URL
+        subscription_url = user_info.get('subscription_url', '')
+        if subscription_url:
+            copy_service.handle_copy_request(message.chat.id, subscription_url, "subscription")
+        else:
+            bot.send_message(message.chat.id, "❌ Subscription URL не найден")
+    elif copy_type == "referral":
+        # Копирование реферальной ссылки
+        bot_username = bot.get_me().username
+        referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+        copy_service.handle_copy_request(message.chat.id, referral_link, "referral")
+    else:
+        bot.send_message(message.chat.id, "❌ Неизвестный тип копирования")
+
+@handle_error
+def handle_qr_request(message, qr_type):
+    """Обработать запрос на QR-код"""
+    user_id = message.from_user.id
+    username = message.from_user.username or message.from_user.first_name or "user"
+    
+    # Получаем информацию о пользователе
+    user_info = marzban_service.get_user_info(username)
+    
+    if qr_type == "vless" and user_info:
+        # QR-код VLESS ссылки
+        vless_link = user_info.get('links', [{}])[0].get('link', '')
+        if vless_link:
+            copy_service.handle_qr_request(message.chat.id, vless_link, "vless")
+        else:
+            bot.send_message(message.chat.id, "❌ VLESS ссылка не найдена")
+    elif qr_type == "subscription" and user_info:
+        # QR-код Subscription URL
+        subscription_url = user_info.get('subscription_url', '')
+        if subscription_url:
+            copy_service.handle_qr_request(message.chat.id, subscription_url, "subscription")
+        else:
+            bot.send_message(message.chat.id, "❌ Subscription URL не найден")
+    elif qr_type == "referral":
+        # QR-код реферальной ссылки
+        bot_username = bot.get_me().username
+        referral_link = f"https://t.me/{bot_username}?start=ref_{user_id}"
+        copy_service.handle_qr_request(message.chat.id, referral_link, "referral")
+    else:
+        bot.send_message(message.chat.id, "❌ Неизвестный тип QR-кода")
+
+@handle_error
+def handle_quick_top_up(message, amount):
+    """Обработать быстрое пополнение"""
+    user_id = message.from_user.id
+    days = int(amount / 4)
+    
+    # Показываем анимацию платежа
+    sticker_service.animate_payment_process(message.chat.id, amount)
+    
+    # Добавляем средства на баланс
+    user_service.add_balance(user_id, amount)
+    
+    # Отправляем уведомление об успехе
+    sticker_service.send_celebration(
+        message.chat.id, 
+        f"💰 Баланс пополнен на {amount} ₽! Доступно {days} дней"
+    )
+    
+    # Показываем обновленную информацию о балансе
+    show_balance_menu(message)
+
 if __name__ == "__main__":
     logger.info("Запуск улучшенного бота...")
     
     # Проверяем доступность Marzban API
     if not marzban_service.health_check():
         logger.warning("Marzban API недоступен, но бот продолжает работу")
+    
+    # Запускаем систему ежедневной оплаты
+    try:
+        daily_payment_service.start_daily_checker()
+        logger.info("Система ежедневной оплаты запущена")
+    except Exception as e:
+        logger.error(f"Ошибка запуска системы ежедневной оплаты: {e}")
+    
+    # Проверяем пользователей с низким балансом
+    try:
+        daily_payment_service.check_low_balance_users()
+        logger.info("Проверка пользователей с низким балансом завершена")
+    except Exception as e:
+        logger.error(f"Ошибка проверки пользователей с низким балансом: {e}")
     
     # Попытка запуска с обработкой конфликта
     max_retries = 3
