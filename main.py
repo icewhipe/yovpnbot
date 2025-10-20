@@ -30,14 +30,24 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Загрузка конфигурации
-BOT_TOKEN = config('USERBOT_TOKEN', default='8385845645:AAGiZhSwkRgndegtTsy573Smnul2wFNwLu0')
-MARZBAN_API_URL = config('MARZBAN_API_URL', default='https://alb-vpnprimex.duckdns.org:443/api')
-MARZBAN_ADMIN_TOKEN = config('MARZBAN_ADMIN_TOKEN', default='')
+BOT_TOKEN = config('USERBOT_TOKEN', default=None)
+MARZBAN_API_URL = config('MARZBAN_API_URL', default=None)
+MARZBAN_ADMIN_TOKEN = config('MARZBAN_ADMIN_TOKEN', default=None)
 DB_HOST = config('DB_HOST', default='localhost')
 DB_PORT = config('DB_PORT', default=3306, cast=int)
 DB_NAME = config('DB_NAME', default='marzban')
 DB_USER = config('DB_USER', default='marzban')
-DB_PASSWORD = config('DB_PASSWORD', default='DcR92D5bNArCjVTpakf')
+DB_PASSWORD = config('DB_PASSWORD', default=None)
+
+# Проверка обязательных переменных окружения
+if BOT_TOKEN is None:
+    raise ValueError("Переменная окружения USERBOT_TOKEN не установлена.")
+if MARZBAN_API_URL is None:
+    raise ValueError("Переменная окружения MARZBAN_API_URL не установлена.")
+if MARZBAN_ADMIN_TOKEN is None:
+    raise ValueError("Переменная окружения MARZBAN_ADMIN_TOKEN не установлена.")
+if DB_PASSWORD is None:
+    raise ValueError("Переменная окружения DB_PASSWORD не установлена.")
 
 # Создание бота
 bot = telebot.TeleBot(BOT_TOKEN)

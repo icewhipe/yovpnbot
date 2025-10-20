@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  yovpn-bot:
+    build: .
+    container_name: yovpn-telegram-bot
+    restart: unless-stopped
+    environment:
+      - USERBOT_TOKEN=${USERBOT_TOKEN}
+      - MARZBAN_API_URL=${MARZBAN_API_URL}
+      - MARZBAN_ADMIN_TOKEN=${MARZBAN_ADMIN_TOKEN}
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-marzban}
+      - DB_USER=${DB_USER:-marzban}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DATA_FILE=/app/data/bot_data.json
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - yovpn-network
+
+  # Опционально: база данных MySQL
+  mysql:
+    image: mysql:8.0
+    container_name: yovpn-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${DB_NAME:-marzban}
+      - MYSQL_USER=${DB_USER:-marzban}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - yovpn-network
+    ports:
+      - "3306:3306"
+
+networks:
+  yovpn-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
