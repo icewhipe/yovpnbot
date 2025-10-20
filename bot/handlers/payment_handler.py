@@ -6,7 +6,7 @@
 import logging
 from aiogram import Dispatcher
 from aiogram.types import CallbackQuery, Message
-from aiogram.filters import Text
+from aiogram import F
 
 from assets.emojis.interface import EMOJI, format_balance
 
@@ -252,15 +252,15 @@ def register_payment_handler(dp: Dispatcher):
     Args:
         dp: Диспетчер бота
     """
-    dp.callback_query.register(handle_top_up, Text("top_up"))
-    dp.callback_query.register(handle_my_balance, Text("my_balance"))
+    dp.callback_query.register(handle_top_up, F.data == "top_up")
+    dp.callback_query.register(handle_my_balance, F.data == "my_balance")
     
     # Регистрируем обработчики для сумм платежей
     for amount in [40, 80, 120, 200, 400]:
-        dp.callback_query.register(handle_payment_amount, Text(f"pay_{amount}"))
+        dp.callback_query.register(handle_payment_amount, F.data == f"pay_{amount}")
     
     # Регистрируем обработчики способов оплаты
     for method in ["card", "yoomoney", "crypto", "demo"]:
-        dp.callback_query.register(handle_payment_method, Text(f"pay_method_{method}"))
+        dp.callback_query.register(handle_payment_method, F.data == f"pay_method_{method}")
     
     logger.info("✅ Обработчики платежей зарегистрированы")

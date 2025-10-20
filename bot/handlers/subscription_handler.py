@@ -6,7 +6,7 @@
 import logging
 from aiogram import Dispatcher
 from aiogram.types import CallbackQuery, Message
-from aiogram.filters import Text
+from aiogram import F
 
 from assets.emojis.interface import EMOJI, get_emoji_combination
 
@@ -249,9 +249,9 @@ def register_subscription_handler(dp: Dispatcher):
     Args:
         dp: Диспетчер бота
     """
-    dp.callback_query.register(handle_my_subscriptions, Text("my_subscriptions"))
-    dp.callback_query.register(handle_activate_subscription, Text("activate_subscription"))
-    dp.callback_query.register(handle_setup_vpn, Text("setup_vpn"))
-    dp.callback_query.register(handle_copy_config, Text("copy_config"))
+    dp.callback_query.register(handle_my_subscriptions, F.data == "my_subscriptions")
+    dp.callback_query.register(handle_activate_subscription, F.data == "activate_subscription")
+    dp.callback_query.register(handle_setup_vpn, F.data == "setup_vpn")
+    dp.callback_query.register(handle_copy_config, F.data == "copy_config")
     
     logger.info("✅ Обработчики подписок зарегистрированы")

@@ -9,6 +9,7 @@ from .payment_handler import register_payment_handler
 from .settings_handler import register_settings_handler
 from .support_handler import register_support_handler
 from .callback_handler import register_callback_handler
+from .admin_handler import admin_router, init_admin_panel
 
 def register_handlers(dp):
     """
@@ -23,3 +24,6 @@ def register_handlers(dp):
     register_settings_handler(dp)
     register_support_handler(dp)
     register_callback_handler(dp)
+    
+    # Регистрируем админ панель
+    dp.include_router(admin_router)
