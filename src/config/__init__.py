@@ -1,4 +1,4 @@
 # Config package
-from .config import config, validate_config
+from .config import config
 
-__all__ = ['config', 'validate_config']
+__all__ = ['config']
