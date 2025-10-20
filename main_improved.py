@@ -252,14 +252,21 @@ def show_main_menu(message):
     if not user_info and username:
         logger.info(f"Пользователь {username} не найден в Marzban, создаем...")
         try:
-            # Создаем пользователя с тестовым периодом на 7 дней
-            created_user = marzban_service.create_test_user(username, user_id)
-            if created_user:
-                logger.info(f"Пользователь {username} успешно создан в Marzban")
-                # Получаем информацию о созданном пользователе
-                user_info = marzban_service.get_user_info(username)
+            # Получаем баланс пользователя
+            user_stats = user_service.get_user_stats(user_id)
+            balance = user_stats.get('balance', 0)
+            
+            if balance >= 4:  # Если есть средства на 1 день
+                # Создаем пользователя с подпиской на 1 день
+                created_user = marzban_service.create_user(username, user_id, days=1)
+                if created_user:
+                    logger.info(f"Пользователь {username} успешно создан в Marzban с подпиской на 1 день")
+                    # Получаем информацию о созданном пользователе
+                    user_info = marzban_service.get_user_info(username)
+                else:
+                    logger.warning(f"Не удалось создать пользователя {username} в Marzban")
             else:
-                logger.warning(f"Не удалось создать пользователя {username} в Marzban")
+                logger.info(f"Недостаточно средств для создания подписки у пользователя {username}")
         except Exception as e:
             logger.error(f"Ошибка создания пользователя {username}: {e}")
     
@@ -307,8 +314,12 @@ def show_main_menu(message):
     )
     
     # Формируем текст приветствия
-    balance = user_stats.get('balance_rub', 0)
+    balance = user_stats.get('balance', 0)
     days = user_stats.get('days_remaining', 0)
+    
+    # Проверяем статус подписки
+    subscription_status = "Активна" if user_info and user_info.get('status') == 'active' else "Неактивна"
+    subscription_emoji = "🟢" if user_info and user_info.get('status') == 'active' else "🔴"
     
     if user_info:
         # Пользователь с подпиской
@@ -319,7 +330,8 @@ def show_main_menu(message):
 ├ ID: {user_id}
 ├ Username: @{username}
 ├ Баланс: {balance} ₽ (≈ {days} дн.)
-└ Подписок: 1
+├ Подписка: {subscription_emoji} {subscription_status}
+└ Стоимость: 4 ₽/день
 
 {EMOJI['rocket']} <b>Выберите действие:</b>
 """
@@ -329,13 +341,14 @@ def show_main_menu(message):
 {EMOJI['user']} <b>Добро пожаловать, {first_name}!</b>
 
 {EMOJI['gift']} <b>Подарок для новых пользователей!</b>
-Вы получили 7 дней бесплатного доступа к VPN
+Вы получили 20 ₽ на баланс (5 дней доступа)
 
 <b>Ваш профиль:</b>
 ├ ID: {user_id}
 ├ Username: @{username}
 ├ Баланс: {balance} ₽ (≈ {days} дн.)
-└ Подписок: 0
+├ Подписка: 🔴 Неактивна
+└ Стоимость: 4 ₽/день
 
 {EMOJI['rocket']} <b>Выберите действие:</b>
 """
@@ -454,12 +467,39 @@ def show_my_subscriptions(message):
     # Получаем информацию о пользователе из Marzban
     user_info = marzban_service.get_user_info(username)
     
+    # Получаем статистику пользователя
+    user_stats = user_service.get_user_stats(user_id)
+    balance = user_stats.get('balance', 0)
+    days_remaining = user_stats.get('days_remaining', 0)
+    
     if not user_info:
-        text = f"{EMOJI['subscription']} <b>Мои подписки</b>\n\n{EMOJI['warning']} У вас нет активных подписок"
+        text = f"""
+{EMOJI['subscription']} <b>Мои подписки</b>
+
+{EMOJI['warning']} <b>У вас нет активных подписок</b>
+
+<b>Ваш баланс:</b> {balance} ₽
+<b>Доступно дней:</b> {days_remaining}
+<b>Стоимость:</b> 4 ₽/день
+
+Для активации подписки пополните баланс.
+"""
     else:
         # Формируем информацию о подписке
-        status_emoji = EMOJI.get('active', '🟢') if user_info.get('status') == 'active' else EMOJI.get('expired', '🔴')
-        text = f"{EMOJI['subscription']} <b>Мои подписки</b>\n\n{status_emoji} <b>Статус:</b> {user_info.get('status', 'Неизвестно')}\n{EMOJI['device']} <b>Устройства:</b> {user_info.get('used_traffic', 0)}/{user_info.get('data_limit', 'Безлимит')}"
+        status = user_info.get('status', 'Неизвестно')
+        status_emoji = "🟢" if status == 'active' else "🔴"
+        
+        text = f"""
+{EMOJI['subscription']} <b>Мои подписки</b>
+
+{status_emoji} <b>Статус:</b> {status}
+{EMOJI['balance']} <b>Баланс:</b> {balance} ₽
+{EMOJI['calendar']} <b>Доступно дней:</b> {days_remaining}
+{EMOJI['device']} <b>Трафик:</b> Безлимит
+{EMOJI['money']} <b>Стоимость:</b> 4 ₽/день
+
+{EMOJI['info']} Подписка продлевается автоматически при наличии средств на балансе.
+"""
     
     keyboard = types.InlineKeyboardMarkup(row_width=1)
     keyboard.add(types.InlineKeyboardButton(f"{EMOJI['back']} Назад", callback_data="back_to_main"))
@@ -794,7 +834,46 @@ def show_channel_link(message):
 @handle_error
 def get_test_period(message, username):
     """Получить тестовый период"""
-    bot.send_message(message.chat.id, f"{EMOJI['gift']} <b>Тестовый период</b>\n\n{EMOJI['warning']} Функция в разработке")
+    user_id = message.from_user.id
+    
+    # Получаем статистику пользователя
+    user_stats = user_service.get_user_stats(user_id)
+    balance = user_stats.get('balance', 0)
+    
+    if balance >= 4:  # Если есть средства на 1 день
+        # Создаем пользователя в Marzban с подпиской на 1 день
+        try:
+            created_user = marzban_service.create_user(username, user_id, days=1)
+            if created_user:
+                text = f"""
+{EMOJI['gift']} <b>Подписка активирована!</b>
+
+{EMOJI['check']} Ваша подписка успешно создана
+{EMOJI['balance']} Баланс: {balance} ₽
+{EMOJI['calendar']} Доступно дней: {int(balance / 4)}
+{EMOJI['money']} Стоимость: 4 ₽/день
+
+{EMOJI['info']} Подписка будет продлеваться автоматически при наличии средств на балансе.
+"""
+                bot.send_message(message.chat.id, text, parse_mode='HTML')
+                
+                # Отправляем уведомление о возобновлении подписки
+                notification_service.send_subscription_reactivated_notification(user_id, balance)
+            else:
+                bot.send_message(message.chat.id, f"{EMOJI['error']} <b>Ошибка активации</b>\n\nНе удалось создать подписку. Попробуйте позже.")
+        except Exception as e:
+            logger.error(f"Ошибка создания подписки для {username}: {e}")
+            bot.send_message(message.chat.id, f"{EMOJI['error']} <b>Ошибка активации</b>\n\nПроизошла ошибка при создании подписки.")
+    else:
+        text = f"""
+{EMOJI['warning']} <b>Недостаточно средств</b>
+
+{EMOJI['balance']} Ваш баланс: {balance} ₽
+{EMOJI['money']} Требуется: 4 ₽ (1 день)
+
+Пополните баланс для активации подписки.
+"""
+        bot.send_message(message.chat.id, text, parse_mode='HTML')
 
 @handle_error
 def handle_subscription_purchase(message, callback_data):
@@ -857,6 +936,20 @@ if __name__ == "__main__":
     # Проверяем доступность Marzban API
     if not marzban_service.health_check():
         logger.warning("Marzban API недоступен, но бот продолжает работу")
+    
+    # Запускаем систему ежедневной оплаты
+    try:
+        daily_payment_service.start_daily_checker()
+        logger.info("Система ежедневной оплаты запущена")
+    except Exception as e:
+        logger.error(f"Ошибка запуска системы ежедневной оплаты: {e}")
+    
+    # Проверяем пользователей с низким балансом
+    try:
+        daily_payment_service.check_low_balance_users()
+        logger.info("Проверка пользователей с низким балансом завершена")
+    except Exception as e:
+        logger.error(f"Ошибка проверки пользователей с низким балансом: {e}")
     
     # Попытка запуска с обработкой конфликта
     max_retries = 3
