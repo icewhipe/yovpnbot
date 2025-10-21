@@ -73,7 +73,14 @@ class BotConfig:
         
         # Настройки API
         self.API_HOST = decouple_config('API_HOST', default='0.0.0.0')
-        self.API_PORT = int(decouple_config('API_PORT', default='8000'))
+        
+        # Handle API_PORT with special case for Railway's $PORT variable
+        api_port_value = decouple_config('API_PORT', default='8000')
+        if api_port_value == '$PORT':
+            # If API_PORT is set to literal '$PORT', try to get PORT from environment
+            api_port_value = os.environ.get('PORT', '8000')
+        self.API_PORT = int(api_port_value)
+        
         self.API_PREFIX = decouple_config('API_PREFIX', default='/api/v1')
         
         # Настройки файлов

@@ -58,7 +58,7 @@
   CORS_ORIGINS=*
   REDIS_URL=${{Redis.REDIS_URL}}
   API_HOST=0.0.0.0
-  API_PORT=$PORT
+  API_PORT=$PORT  # Railway's PORT variable will be automatically used
   ```
 - [ ] Сгенерировал публичный URL: Settings → Networking → "Generate Domain"
 - [ ] Сохранил API URL: `_______________`
@@ -135,7 +135,7 @@ MARZBAN_PASSWORD=
 CORS_ORIGINS=https://webapp-production-xxxx.up.railway.app
 REDIS_URL=${{Redis.REDIS_URL}}
 API_HOST=0.0.0.0
-API_PORT=$PORT
+API_PORT=$PORT  # Railway's PORT variable will be automatically used
 ```
 
 ### WebApp (webapp)

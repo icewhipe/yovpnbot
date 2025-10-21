@@ -153,7 +153,7 @@ REDIS_URL=${{Redis.REDIS_URL}}
 
 # API Settings
 API_HOST=0.0.0.0
-API_PORT=$PORT
+API_PORT=$PORT  # Railway's PORT variable will be automatically used
 ```
 
 #### Шаг 4: Получите публичный URL API
