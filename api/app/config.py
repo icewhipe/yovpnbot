@@ -1,13 +1,14 @@
 from pydantic_settings import BaseSettings
 from typing import List
+import os
 
 
 class Settings(BaseSettings):
     # App
     app_name: str = "YoVPN WebApp API"
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
-    api_reload: bool = True
+    api_port: int = int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
+    api_reload: bool = False
     
     # Telegram
     telegram_bot_token: str
