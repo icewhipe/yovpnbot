@@ -1,5 +1,5 @@
-# YoVPN Bot Dependencies
-# Основные зависимости для работы бота
+# YoVPN Bot - Минимальные зависимости для продакшена
+# Используйте этот файл для быстрой установки только необходимых пакетов
 
 # Telegram Bot Framework
 aiogram==3.4.1
@@ -16,7 +16,6 @@ alembic==1.13.1
 
 # Caching
 redis==5.0.1
-aioredis==2.0.1
 
 # HTTP Client
 httpx==0.25.2
@@ -26,9 +25,8 @@ aiofiles==23.2.1
 pydantic==2.5.0
 pydantic-settings==2.1.0
 
-# Monitoring
+# Monitoring (опционально)
 sentry-sdk==1.38.0
-prometheus-client==0.19.0
 
 # Logging
 structlog==23.2.0
@@ -38,27 +36,13 @@ colorama==0.4.6
 qrcode==7.4.2
 Pillow==10.1.0
 
-# Security - ИСПРАВЛЕНО: обновлена версия cryptography
+# Security
 cryptography==43.0.3
 passlib==1.7.4
 
 # Utilities
 python-dateutil==2.8.2
 pytz==2023.3
-click==8.1.7
-
-# Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-black==23.11.0
-isort==5.12.0
-flake8==6.1.0
-mypy==1.7.1
-
-# Security Tools
-bandit==1.7.5
-safety==2.3.5
 
 # Performance
 uvloop==0.19.0
