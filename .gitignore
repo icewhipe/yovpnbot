@@ -60,3 +60,8 @@ docker-compose.override.yml
 *.crt
 *.pem
 certs/
+
+# User data
+data/
+data.json
+*.tmp

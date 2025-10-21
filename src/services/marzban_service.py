@@ -268,17 +268,39 @@ class MarzbanService:
     
     def health_check(self) -> bool:
         """Проверка доступности API"""
+        if not self.api_url:
+            logger.warning("⚠️ Marzban API URL не настроен")
+            return False
+        
+        if not self.admin_token:
+            logger.warning("⚠️ Marzban admin token не настроен")
+            return False
+        
         try:
-            logger.info(f"Проверяем доступность Marzban API: {self.api_url}")
-            logger.info(f"Используем токен: {self.admin_token[:10]}..." if self.admin_token else "Токен не установлен")
+            logger.info(f"🔄 Проверяем доступность Marzban API: {self.api_url}")
+            logger.info(f"🔑 Используем токен: {self.admin_token[:10]}..." if self.admin_token else "Токен не установлен")
             
+            # Пробуем с /api префиксом
+            result = self._make_request('GET', '/api/system')
+            if result:
+                logger.info("✅ Marzban API доступен (/api/system)")
+                return True
+            
+            # Пробуем без /api префикса
+            logger.info("🔄 Пробуем альтернативный эндпоинт: /system")
             result = self._make_request('GET', '/system')
             if result:
-                logger.info("Marzban API доступен")
+                logger.info("✅ Marzban API доступен (/system)")
                 return True
-            else:
-                logger.warning("Marzban API недоступен")
-                return False
+            
+            logger.warning("❌ Marzban API недоступен")
+            logger.warning(f"🌐 Проверьте URL: {self.api_url}")
+            logger.warning(f"🔑 Проверьте токен в .env: MARZBAN_ADMIN_TOKEN")
+            return False
+            
         except Exception as e:
-            logger.error(f"Ошибка проверки здоровья API: {e}")
+            logger.error(f"❌ Ошибка проверки здоровья API: {e}")
+            logger.error(f"🔍 URL: {self.api_url}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
