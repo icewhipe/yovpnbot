@@ -10,7 +10,7 @@ from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 router = Router()
 
 # WebApp URL (замените на ваш актуальный URL после деплоя)
-WEBAPP_URL = "https://your-webapp-domain.com"  # или для разработки: http://localhost:3000
+WEBAPP_URL = "https://webapp-production-5fe6.up.railway.app"  # или для разработки: http://localhost:3000
 
 
 @router.message(Command("webapp"))
