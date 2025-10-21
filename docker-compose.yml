@@ -6,6 +6,9 @@ version: '3.8'
 services:
   # Основной бот
   bot:
+    environment:
+      - BOT_TOKEN=8385845645:AAGiZhSwkRgndegtTsy573Smnul2wFNwLu0
+      - MARZBAN_ADMIN_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJleWozc2R1bldCdUx0YVhiQzhrIiwiYWNjZXNzIjoic3VkbyIsImlhdCI6MTc2MDk4MDU5NCwiZXhwIjoxNzYxMDY2OTk0fQ.EOUkZB6iKeUIwGzn9N9U5YLFcj6NlbTQe0tK2l5qJ9Y
     build: .
     container_name: yovpn-bot
     env_file: .env
