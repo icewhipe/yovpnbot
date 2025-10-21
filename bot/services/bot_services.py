@@ -13,6 +13,7 @@ from .payment_service import PaymentService
 from .notification_service import NotificationService
 from .animation_service import AnimationService
 from .ui_service import UIService
+from .security_service import SecurityService
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,9 @@ class BotServices:
         self.notification_service = NotificationService(bot)
         self.animation_service = AnimationService(bot)
         self.ui_service = UIService()
+        self.security_service = SecurityService()
         
-        logger.info("✅ Все сервисы инициализированы")
+        logger.info("✅ Все сервисы инициализированы (включая SecurityService)")
     
     async def start_background_tasks(self):
         """Запуск фоновых задач"""
@@ -108,3 +110,7 @@ class BotServices:
     def get_ui_service(self) -> UIService:
         """Получить сервис UI"""
         return self.ui_service
+    
+    def get_security_service(self) -> SecurityService:
+        """Получить сервис безопасности"""
+        return self.security_service
