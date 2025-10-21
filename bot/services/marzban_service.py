@@ -54,18 +54,70 @@ class MarzbanService:
         Returns:
             bool: Доступен ли API
         """
+        if not self.api_url:
+            logger.warning("⚠️ Marzban API URL не настроен")
+            self._available = False
+            return False
+        
+        if not self.admin_token:
+            logger.warning("⚠️ Marzban admin token не настроен")
+            self._available = False
+            return False
+        
         try:
             session = await self._get_session()
-            async with session.get(f"{self.api_url}/system") as response:
+            api_endpoint = f"{self.api_url}/api/system"
+            
+            logger.info(f"🔄 Проверка доступности Marzban API: {api_endpoint}")
+            
+            async with session.get(api_endpoint) as response:
                 if response.status == 200:
                     self._available = True
                     logger.info("✅ Marzban API доступен")
                     return True
-                else:
-                    logger.warning(f"⚠️ Marzban API недоступен: {response.status}")
+                elif response.status == 401:
+                    logger.error("❌ Ошибка авторизации Marzban API: неверный токен")
+                    logger.error(f"🔑 Проверьте MARZBAN_ADMIN_TOKEN в .env")
+                    self._available = False
                     return False
+                elif response.status == 404:
+                    # Попробуем без /api префикса
+                    alt_endpoint = f"{self.api_url}/system"
+                    logger.info(f"🔄 Пробуем альтернативный эндпоинт: {alt_endpoint}")
+                    
+                    async with session.get(alt_endpoint) as alt_response:
+                        if alt_response.status == 200:
+                            self._available = True
+                            logger.info("✅ Marzban API доступен (альтернативный эндпоинт)")
+                            return True
+                        else:
+                            error_text = await alt_response.text()
+                            logger.error(f"❌ Marzban API недоступен: HTTP {alt_response.status}")
+                            logger.error(f"📄 Ответ: {error_text[:200]}")
+                            self._available = False
+                            return False
+                else:
+                    error_text = await response.text()
+                    logger.warning(f"⚠️ Marzban API недоступен: HTTP {response.status}")
+                    logger.warning(f"📄 Ответ: {error_text[:200]}")
+                    self._available = False
+                    return False
+                    
+        except aiohttp.ClientConnectorError as e:
+            logger.error(f"❌ Не удалось подключиться к Marzban API: {e}")
+            logger.error(f"🌐 Проверьте, что URL доступен: {self.api_url}")
+            self._available = False
+            return False
+        except aiohttp.ClientTimeout as e:
+            logger.error(f"❌ Таймаут при подключении к Marzban API: {e}")
+            logger.error(f"⏱️ Сервер может быть перегружен или недоступен")
+            self._available = False
+            return False
         except Exception as e:
-            logger.error(f"❌ Ошибка проверки Marzban API: {e}")
+            logger.error(f"❌ Неожиданная ошибка проверки Marzban API: {e}")
+            logger.error(f"🔍 URL: {self.api_url}")
+            import traceback
+            logger.error(traceback.format_exc())
             self._available = False
             return False
     

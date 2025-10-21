@@ -30,9 +30,21 @@ class UserService:
         Args:
             data_file: Путь к файлу с данными
         """
-        self.data_file = Path(data_file)
+        # Создаем путь к файлу данных
+        if not Path(data_file).is_absolute():
+            # Если путь относительный, создаем в директории data
+            data_dir = Path("data")
+            data_dir.mkdir(exist_ok=True)
+            self.data_file = data_dir / data_file
+        else:
+            self.data_file = Path(data_file)
+        
+        # Убеждаемся, что родительская директория существует
+        self.data_file.parent.mkdir(parents=True, exist_ok=True)
+        
         self.users = self._load_users()
         logger.info(f"✅ UserService инициализирован, загружено {len(self.users)} пользователей")
+        logger.info(f"📁 Файл данных: {self.data_file.absolute()}")
     
     def _load_users(self) -> Dict[int, Dict[str, Any]]:
         """
@@ -55,16 +67,32 @@ class UserService:
         Сохранить пользователей в файл и инвалидировать кэш
         """
         try:
-            with open(self.data_file, 'w', encoding='utf-8') as f:
+            # Убеждаемся, что директория существует
+            self.data_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Сначала записываем во временный файл
+            temp_file = self.data_file.with_suffix('.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(self.users, f, ensure_ascii=False, indent=2)
+            
+            # Затем атомарно переименовываем
+            temp_file.replace(self.data_file)
             
             # Инвалидируем кэш пользователей
             cache.delete_pattern("user:")
             cache.delete_pattern("user_stats:")
             
             logger.debug("💾 Пользователи сохранены, кэш инвалидирован")
+        except PermissionError as e:
+            logger.error(f"❌ Ошибка доступа при сохранении пользователей: {e}")
+            logger.error(f"📁 Проверьте права доступа к: {self.data_file.absolute()}")
+        except OSError as e:
+            logger.error(f"❌ Ошибка файловой системы при сохранении пользователей: {e}")
+            logger.error(f"📁 Путь: {self.data_file.absolute()}")
         except Exception as e:
-            logger.error(f"❌ Ошибка сохранения пользователей: {e}")
+            logger.error(f"❌ Неожиданная ошибка сохранения пользователей: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
     
     async def create_or_update_user(self, user_id: int, username: Optional[str], first_name: str) -> Dict[str, Any]:
         """
