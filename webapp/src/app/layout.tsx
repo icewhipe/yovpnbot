@@ -34,6 +34,24 @@ export default function RootLayout({
           src="https://telegram.org/js/telegram-web-app.js" 
           strategy="beforeInteractive"
         />
+        
+        {/* PWA Service Worker */}
+        <Script id="register-sw" strategy="afterInteractive">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(
+                  (registration) => {
+                    console.log('SW registered:', registration);
+                  },
+                  (error) => {
+                    console.log('SW registration failed:', error);
+                  }
+                );
+              });
+            }
+          `}
+        </Script>
       </head>
       <body>
         <ThemeProvider>
