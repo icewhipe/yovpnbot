@@ -22,19 +22,24 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent))
 
 # Настройка логирования
-log_to_file = os.getenv('LOG_TO_FILE', '0') == '1'
-log_file = os.getenv('LOG_FILE', '/tmp/bot.log')
+log_to_file = os.getenv("LOG_TO_FILE", "0") == "1"
+log_file = os.getenv("LOG_FILE", "/tmp/bot.log")
 
-handlers = [logging.StreamHandler(sys.stdout)]
+# На всякий случай, если указали путь с каталогом — создадим каталог
 if log_to_file:
-    handlers = [logging.FileHandler(log_file)]
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-logging.basicConfig(
-    level=os.getenv('LOG_LEVEL', 'INFO').upper(),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=handlers,
+logging_kwargs = dict(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
-logger = logging.getLogger(__name__)
+
+if log_to_file:
+    # Пишем в файл (на Railway /tmp доступен на запись)
+    logging.basicConfig(filename=log_file, **logging_kwargs)
+else:
+    # Пишем в stdout (Railway собирает такие логи)
+    logging.basicConfig(stream=sys.stdout, **logging_kwargs)
 
 class YoVPNBotManager:
     """
