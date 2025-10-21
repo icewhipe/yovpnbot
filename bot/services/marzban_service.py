@@ -269,6 +269,19 @@ class MarzbanService:
             logger.error(f"❌ Ошибка генерации конфигурации для {username}: {e}")
             return None
     
+    async def get_user_subscription(self, username: str) -> Optional[Dict[str, Any]]:
+        """
+        Получить subscription URL для пользователя
+        Alias для get_user_config для совместимости с API
+        
+        Args:
+            username: Имя пользователя
+        
+        Returns:
+            Optional[Dict]: Данные подписки с subscription_url
+        """
+        return await self.get_user_config(username)
+    
     def _generate_vless_config(self, user_data: Dict[str, Any]) -> Dict[str, str]:
         """
         Сгенерировать VLESS конфигурацию

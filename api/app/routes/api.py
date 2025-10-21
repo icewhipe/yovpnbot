@@ -7,6 +7,8 @@ from app.models.schemas import (
     VersionResponse,
     ActivationTrackRequest,
     ActivationTrackResponse,
+    ActivateSubscriptionRequest,
+    ActivateSubscriptionResponse,
     ErrorResponse,
 )
 from app.utils.telegram import validate_telegram_init_data, extract_user_id_from_init_data
@@ -94,6 +96,38 @@ async def track_activation(
         success=success,
         message="Activation tracked successfully" if success else "Failed to track activation"
     )
+
+
+@router.post("/subscription/activate", response_model=ActivateSubscriptionResponse)
+async def activate_subscription(
+    data: ActivateSubscriptionRequest,
+    x_telegram_init_data: Optional[str] = Header(None)
+):
+    """
+    Activate subscription - creates or updates user in Marzban
+    This is the main endpoint for subscription activation
+    """
+    
+    # Validate init data if provided
+    if x_telegram_init_data:
+        is_valid, _ = validate_telegram_init_data(x_telegram_init_data)
+        if not is_valid:
+            raise HTTPException(status_code=401, detail="Invalid Telegram data")
+    
+    # Activate subscription in Marzban
+    result = await subscription_service.activate_subscription(
+        user_id=data.user_id,
+        platform=data.platform,
+        telegram_username=data.telegram_username
+    )
+    
+    if not result:
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to activate subscription. Please check Marzban connection."
+        )
+    
+    return ActivateSubscriptionResponse(**result)
 
 
 @router.get("/health")

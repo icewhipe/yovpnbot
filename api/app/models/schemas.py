@@ -43,6 +43,22 @@ class ActivationTrackResponse(BaseModel):
     message: str
 
 
+class ActivateSubscriptionRequest(BaseModel):
+    """Subscription activation request"""
+    user_id: int
+    platform: str
+    telegram_username: Optional[str] = None
+
+
+class ActivateSubscriptionResponse(BaseModel):
+    """Subscription activation response"""
+    success: bool
+    message: str
+    subscription_uri: Optional[str] = None
+    expires_at: Optional[str] = None
+    marzban_username: Optional[str] = None
+
+
 class ErrorResponse(BaseModel):
     """Error response"""
     error: str

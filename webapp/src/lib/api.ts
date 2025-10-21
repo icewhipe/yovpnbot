@@ -98,6 +98,36 @@ export const apiService = {
       };
     }
   },
+
+  // Activate subscription - creates/updates user in Marzban
+  async activateSubscription(
+    userId: number, 
+    platform: string, 
+    telegramUsername?: string
+  ): Promise<ApiResponse<{
+    success: boolean;
+    message: string;
+    subscription_uri?: string;
+    expires_at?: string;
+    marzban_username?: string;
+  }>> {
+    try {
+      const response = await api.post('/api/subscription/activate', {
+        user_id: userId,
+        platform,
+        telegram_username: telegramUsername,
+      });
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.response?.data?.message || 'Failed to activate subscription',
+      };
+    }
+  },
 };
 
 export default api;
