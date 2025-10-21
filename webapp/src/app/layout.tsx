@@ -2,6 +2,14 @@ import type { Metadata } from 'next'
 import '@/styles/globals.css'
 import ThemeProvider from '@/components/ThemeProvider'
 import Script from 'next/script'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ 
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500', '600', '700', '800'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: 'YoVPN - v2raytun Activation',
@@ -53,7 +61,7 @@ export default function RootLayout({
           `}
         </Script>
       </head>
-      <body>
+      <body className={inter.variable}>
         <ThemeProvider>
           {children}
         </ThemeProvider>
