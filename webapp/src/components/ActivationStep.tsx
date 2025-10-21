@@ -90,26 +90,73 @@ export default function ActivationStep() {
   };
 
   const handleActivate = async () => {
-    if (!subscriptionUri || !platform) return;
+    if (!platform) return;
     
     hapticFeedback.impact('heavy');
     setIsActivating(true);
+    setError('');
 
     try {
-      // Track activation
       const userId = user?.id || devMode.mockUserId;
-      if (userId) {
-        await apiService.trackActivation(userId, platform.id);
+      const telegramUsername = user?.username;
+      
+      if (!userId) {
+        setError('Не удалось получить ID пользователя');
+        setIsActivating(false);
+        hapticFeedback.notification('error');
+        return;
       }
 
-      // Copy to clipboard first
-      await copyToClipboard(subscriptionUri);
+      console.log('🚀 Activating subscription for user:', userId, 'platform:', platform.id);
+
+      // Call activation endpoint - this creates/updates user in Marzban
+      const activationResult = await apiService.activateSubscription(
+        userId,
+        platform.id,
+        telegramUsername
+      );
+
+      if (!activationResult.success || !activationResult.data) {
+        console.error('Activation failed:', activationResult.error);
+        setError(activationResult.error || 'Не удалось активировать подписку');
+        setIsActivating(false);
+        hapticFeedback.notification('error');
+        return;
+      }
+
+      console.log('✅ Activation successful:', activationResult.data);
+
+      // Get the subscription URI from activation result
+      const activatedSubscriptionUri = activationResult.data.subscription_uri;
+      
+      if (!activatedSubscriptionUri) {
+        setError('Не удалось получить URI подписки');
+        setIsActivating(false);
+        hapticFeedback.notification('error');
+        return;
+      }
+
+      // Update subscription state
+      setSubscriptionUri(activatedSubscriptionUri);
+      setSubscription({
+        userId: userId,
+        subscriptionUri: activatedSubscriptionUri,
+        expiresAt: activationResult.data.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        isActive: true,
+        subscriptionType: 'premium',
+      });
+
+      // Copy to clipboard
+      await copyToClipboard(activatedSubscriptionUri);
       setCopied(true);
       
       // Open deep link
       setTimeout(() => {
-        openDeepLink(subscriptionUri, platform.id);
+        openDeepLink(activatedSubscriptionUri, platform.id);
       }, 500);
+
+      // Track activation (analytics)
+      await apiService.trackActivation(userId, platform.id);
 
       // Show success after 2 seconds
       setTimeout(() => {
@@ -117,10 +164,11 @@ export default function ActivationStep() {
         setActivationSuccess(true);
         hapticFeedback.notification('success');
       }, 2000);
+
     } catch (err) {
       console.error('Activation error:', err);
       setIsActivating(false);
-      setError('Не удалось активировать подписку');
+      setError('Произошла ошибка при активации подписки');
       hapticFeedback.notification('error');
     }
   };

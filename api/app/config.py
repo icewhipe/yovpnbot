@@ -26,8 +26,9 @@ class Settings(BaseSettings):
     
     # Marzban
     marzban_api_url: str
-    marzban_username: str
-    marzban_password: str
+    marzban_username: str = ""
+    marzban_password: str = ""
+    marzban_admin_token: str = ""  # Alternative to username/password
     
     # Download URLs
     android_apk_url: str

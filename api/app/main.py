@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.config import settings
 from app.routes import api
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -10,6 +13,46 @@ app = FastAPI(
     description="API for YoVPN WebApp - Telegram Mini App for v2raytun activation",
     version="1.0.0",
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    logger.info("🚀 Starting YoVPN WebApp API...")
+    logger.info(f"📡 Marzban API URL: {settings.marzban_api_url}")
+    
+    # Import and check marzban service
+    try:
+        from app.services.subscription_service import subscription_service
+        
+        if subscription_service.marzban_service:
+            # Check API availability
+            is_available = await subscription_service.marzban_service.check_api_availability()
+            if is_available:
+                logger.info("✅ Marzban API is available and ready")
+            else:
+                logger.warning("⚠️ Marzban API is not available - check configuration")
+        else:
+            logger.warning("⚠️ Marzban service not initialized - check dependencies")
+    except Exception as e:
+        logger.error(f"❌ Error during startup: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("👋 Shutting down YoVPN WebApp API...")
+    
+    try:
+        from app.services.subscription_service import subscription_service
+        
+        if subscription_service.marzban_service:
+            await subscription_service.marzban_service.close()
+            logger.info("✅ Marzban service closed")
+    except Exception as e:
+        logger.error(f"❌ Error during shutdown: {e}")
 
 # CORS middleware
 app.add_middleware(
