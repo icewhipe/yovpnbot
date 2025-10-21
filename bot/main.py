@@ -33,9 +33,17 @@ from bot.services import BotServices
 
 # Настройка логирования
 logging.basicConfig(
+   log_to_file = os.getenv('LOG_TO_FILE', '0') == '1'
+log_file = os.getenv('LOG_FILE', '/tmp/bot.log')
+
+handlers = [logging.StreamHandler(sys.stdout)]
+if log_to_file:
+    handlers = [logging.FileHandler(log_file)]
+
+logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO').upper(),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler(sys.stdout)],
+    handlers=handlers,
 )
 logger = logging.getLogger(__name__)
 
