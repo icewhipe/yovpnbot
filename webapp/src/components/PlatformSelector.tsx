@@ -126,7 +126,9 @@ export default function PlatformSelector() {
           {PLATFORMS.map((platform, index) => (
             <div
               key={platform.id}
-              ref={(el) => (cardsRef.current[index] = el)}
+              ref={(el) => {
+                cardsRef.current[index] = el;
+              }}
               className={cn(
                 'platform-card glass-dark rounded-2xl p-6 cursor-pointer',
                 'flex flex-col items-center justify-center',
