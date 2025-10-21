@@ -6,6 +6,10 @@ Handles the integration between Telegram Bot and WebApp
 from aiogram import Router, types, F
 from aiogram.filters import Command
 from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
+from bot.handlers.webapp_handler import add_webapp_to_main_menu
+
+commands = await add_webapp_to_main_menu()
+await bot.set_my_commands(commands)
 
 router = Router()
 
