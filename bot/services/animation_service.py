@@ -43,41 +43,72 @@ class AnimationService:
         
         logger.info("✅ AnimationService инициализирован")
     
-    async def send_welcome_message(self, message: Message, user_name: str) -> Message:
+    async def show_loading_animation(self, message: Message) -> None:
+        """
+        Показать современную анимацию загрузки с прогресс-баром
+        Стиль: система подключается к серверам
+        
+        Args:
+            message: Сообщение для редактирования
+        """
+        import asyncio
+        
+        steps = [
+            {"text": "🔄 <b>Инициализация системы...</b>", "delay": 0.8},
+            {"text": "🔐 <b>Настройка шифрования...</b>\n\n███▒▒▒▒▒▒▒ 30%", "delay": 0.9},
+            {"text": "🌐 <b>Подключение к серверам...</b>\n\n██████▒▒▒▒ 60%", "delay": 0.9},
+            {"text": "🛡️ <b>Активация защиты...</b>\n\n█████████▒ 90%", "delay": 0.8},
+            {"text": "✅ <b>Система готова к работе!</b>\n\n██████████ 100%", "delay": 1.0}
+        ]
+        
+        loading_msg = await message.answer(steps[0]["text"], parse_mode='HTML')
+        
+        for i, step in enumerate(steps[1:], 1):
+            await asyncio.sleep(steps[i-1]["delay"])
+            try:
+                await loading_msg.edit_text(step["text"], parse_mode='HTML')
+            except Exception as e:
+                logger.debug(f"Ошибка редактирования анимации: {e}")
+        
+        await asyncio.sleep(steps[-1]["delay"])
+        await loading_msg.delete()
+    
+    async def send_welcome_message(self, message: Message, user_name: str, balance: float = 0.0, subscription_days: int = 0, is_new: bool = False) -> Message:
         """
         Отправить приветственное сообщение с эффектом
+        Использует централизованную систему текстов
         
         Args:
             message: Сообщение для ответа
             user_name: Имя пользователя
+            balance: Баланс пользователя
+            subscription_days: Дни доступа
+            is_new: Новый ли пользователь
         
         Returns:
             Message: Отправленное сообщение
         """
-        welcome_text = f"""
-🎉 <b>Добро пожаловать в YoVPN, {user_name}!</b>
-
-🔒 <b>Безопасный интернет</b> теперь у вас в кармане!
-⚡ <b>Высокая скорость</b> без ограничений
-🛡️ <b>Полная анонимность</b> и защита данных
-💰 <b>Всего 4 рубля в день</b> - честная цена
-
-<b>Что вас ждет:</b>
-• 🚀 Мгновенная активация подписки
-• 📱 Простая настройка на любом устройстве  
-• 🌍 Доступ к серверам по всему миру
-• 💬 Круглосуточная поддержка
-
-<b>Готовы начать?</b> Выберите действие ниже 👇
-        """
-        
-        return await self.reply_with_effect(
-            message,
-            welcome_text,
-            'heart',
-            reply_markup=self._get_main_menu_keyboard(),
-            parse_mode='HTML'
-        )
+        try:
+            from bot.utils.texts import get_welcome_text, get_new_user_welcome_text
+            from bot.keyboards.menu_kb import MenuKeyboards
+            
+            if is_new:
+                welcome_text = get_new_user_welcome_text(user_name)
+            else:
+                welcome_text = get_welcome_text(user_name, balance, subscription_days)
+            
+            return await self.reply_with_effect(
+                message,
+                welcome_text,
+                'heart',
+                reply_markup=MenuKeyboards.get_main_menu(),
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logger.error(f"Ошибка отправки приветствия: {e}")
+            # Fallback на старый текст
+            welcome_text = f"<b>✨ Привет, {user_name}!</b>\n\nДобро пожаловать в YoVPN!"
+            return await message.reply(welcome_text, parse_mode='HTML')
     
     async def send_subscription_activated(self, message: Message, days: int) -> Message:
         """
@@ -277,22 +308,26 @@ class AnimationService:
     
     def _get_main_menu_keyboard(self):
         """Получить клавиатуру главного меню"""
-        from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-        
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text="📱 Мои подписки", callback_data="my_subscriptions"),
-                InlineKeyboardButton(text="💳 Пополнить", callback_data="top_up")
-            ],
-            [
-                InlineKeyboardButton(text="🎁 Рефералы", callback_data="referrals"),
-                InlineKeyboardButton(text="📊 Статистика", callback_data="stats")
-            ],
-            [
-                InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings"),
-                InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")
-            ]
-        ])
+        try:
+            from bot.keyboards.menu_kb import MenuKeyboards
+            return MenuKeyboards.get_main_menu()
+        except Exception:
+            # Fallback на встроенную клавиатуру
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            return InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="📱 Мои подписки", callback_data="my_subscriptions"),
+                    InlineKeyboardButton(text="💳 Пополнить", callback_data="top_up")
+                ],
+                [
+                    InlineKeyboardButton(text="🎁 Рефералы", callback_data="referrals"),
+                    InlineKeyboardButton(text="📊 Статистика", callback_data="stats")
+                ],
+                [
+                    InlineKeyboardButton(text="⚙️ Настройки", callback_data="settings"),
+                    InlineKeyboardButton(text="🆘 Поддержка", callback_data="support")
+                ]
+            ])
     
     def _get_subscription_menu_keyboard(self):
         """Получить клавиатуру меню подписки"""
