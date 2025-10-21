@@ -16,6 +16,8 @@ import logging
 import sys
 import os
 import fcntl
+import time
+import random
 from pathlib import Path
 
 # Добавляем корневую папку в путь
@@ -25,6 +27,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.exceptions import TelegramConflictError
 
 # Импорты конфигурации и сервисов
 from src.config import config
@@ -123,22 +126,66 @@ class YoVPNBot:
         logger.info("YoVPN Bot инициализирован")
     
     async def start(self):
-        """Запуск бота"""
-        try:
-            logger.info("🚀 Запуск YoVPN Bot...")
-            
-            # Запускаем фоновые задачи
-            await self.services.start_background_tasks()
-            
-            # Запускаем бота
-            await self.dp.start_polling(
-                self.bot,
-                allowed_updates=["message", "callback_query"]
-            )
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка при запуске бота: {e}")
-            raise
+        """Запуск бота с автоматическим восстановлением при конфликтах"""
+        max_retries = 10
+        base_delay = 5.0  # Базовая задержка в секундах
+        max_delay = 60.0  # Максимальная задержка в секундах
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info("🚀 Запуск YoVPN Bot...")
+                
+                # Запускаем фоновые задачи
+                await self.services.start_background_tasks()
+                
+                # Запускаем бота
+                await self.dp.start_polling(
+                    self.bot,
+                    allowed_updates=["message", "callback_query"]
+                )
+                
+                # Если polling завершился без ошибок, выходим
+                break
+                
+            except TelegramConflictError as e:
+                # Вычисляем задержку с экспоненциальным отступом и джиттером
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                jitter = random.uniform(0, delay * 0.3)  # Добавляем случайность ±30%
+                total_delay = delay + jitter
+                
+                bot_info = await self.bot.get_me()
+                logger.warning(
+                    f"⚠️ TelegramConflictError: {e}\n"
+                    f"💡 Обнаружен конфликт с другим экземпляром бота (ID: {bot_info.id})\n"
+                    f"🔄 Попытка {attempt + 1}/{max_retries}\n"
+                    f"⏳ Ожидание {total_delay:.2f} секунд перед повторной попыткой...\n"
+                    f"\n📋 Возможные причины конфликта:\n"
+                    f"   1. Другой экземпляр бота запущен на этом или другом сервере\n"
+                    f"   2. Бот запущен в нескольких Docker контейнерах\n"
+                    f"   3. Предыдущий экземпляр не был корректно остановлен\n"
+                    f"\n🔧 Рекомендации:\n"
+                    f"   - Проверьте: docker ps | grep bot\n"
+                    f"   - Проверьте: ps aux | grep 'bot/main.py'\n"
+                    f"   - Убедитесь, что бот не запущен на других серверах\n"
+                )
+                
+                if attempt < max_retries - 1:
+                    # Останавливаем фоновые задачи перед повторной попыткой
+                    await self.services.stop_background_tasks()
+                    
+                    # Ждем перед повторной попыткой
+                    await asyncio.sleep(total_delay)
+                else:
+                    logger.error(
+                        f"❌ Превышено максимальное количество попыток ({max_retries})\n"
+                        f"🚫 Не удалось устранить конфликт с другим экземпляром бота\n"
+                        f"💡 Необходимо вручную остановить все запущенные экземпляры"
+                    )
+                    raise
+                    
+            except Exception as e:
+                logger.error(f"❌ Ошибка при запуске бота: {e}")
+                raise
     
     async def stop(self):
         """Остановка бота"""
