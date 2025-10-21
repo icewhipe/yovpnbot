@@ -31,25 +31,25 @@ from bot.handlers import register_handlers, init_admin_panel
 from bot.middleware import register_middleware
 from bot.services import BotServices
 
-# Настройка логирования
-log_to_file = os.getenv("LOG_TO_FILE", "0") == "1"
-log_file = os.getenv("LOG_FILE", "/tmp/bot.log")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_TO_FILE = os.getenv("LOG_TO_FILE", "0") == "1"
+LOG_FILE = os.getenv("LOG_FILE", "/tmp/bot.log")
 
-# На всякий случай, если указали путь с каталогом — создадим каталог
-if log_to_file:
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+logger = logging.getLogger("yovpn.bot")
+logger.setLevel(LOG_LEVEL)
+logger.handlers.clear()
 
-logging_kwargs = dict(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
 
-if log_to_file:
-    # Пишем в файл (на Railway /tmp доступен на запись)
-    logging.basicConfig(filename=log_file, **logging_kwargs)
+if LOG_TO_FILE:
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    file_handler = logging.FileHandler(LOG_FILE)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
 else:
-    # Пишем в stdout (Railway собирает такие логи)
-    logging.basicConfig(stream=sys.stdout, **logging_kwargs)
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
 
 class YoVPNBot:
     """
