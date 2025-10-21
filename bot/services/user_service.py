@@ -76,15 +76,17 @@ class UserService:
             first_name: Имя пользователя
         
         Returns:
-            Dict: Данные пользователя
+            Dict: Данные пользователя (с ключом 'is_new' для новых пользователей)
         """
-        if user_id not in self.users:
-            # Создаем нового пользователя
+        is_new_user = user_id not in self.users
+        
+        if is_new_user:
+            # Создаем нового пользователя с приветственным бонусом 15₽
             self.users[user_id] = {
                 'user_id': user_id,
                 'username': username,
                 'first_name': first_name,
-                'balance': 0.0,
+                'balance': 15.0,  # Стартовый бонус
                 'subscription_active': False,
                 'subscription_days': 0,
                 'total_payments': 0.0,
@@ -96,9 +98,10 @@ class UserService:
                     'notifications': True,
                     'auto_renewal': True,
                     'language': 'ru'
-                }
+                },
+                'is_new': True  # Флаг нового пользователя
             }
-            logger.info(f"👤 Создан новый пользователь: {first_name} (ID: {user_id})")
+            logger.info(f"👤 Создан новый пользователь: {first_name} (ID: {user_id}) с балансом 15₽")
         else:
             # Обновляем существующего пользователя
             self.users[user_id].update({
@@ -109,7 +112,9 @@ class UserService:
             logger.debug(f"👤 Обновлен пользователь: {first_name} (ID: {user_id})")
         
         self._save_users()
-        return self.users[user_id]
+        user_data = self.users[user_id].copy()
+        user_data['is_new'] = is_new_user
+        return user_data
     
     async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
