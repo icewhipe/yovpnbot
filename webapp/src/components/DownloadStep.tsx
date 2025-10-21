@@ -107,12 +107,12 @@ export default function DownloadStep() {
         </div>
 
         {/* Title */}
-        <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 text-white">
+        <h1 className="text-3xl md:text-4xl font-bold text-center mb-4 text-adaptive-primary">
           Скачайте v2raytun для {platform.name}
         </h1>
 
         {/* Description */}
-        <p className="text-center text-gray-400 mb-8">
+        <p className="text-center text-adaptive-secondary mb-8 font-medium">
           {platform.description}
         </p>
 
@@ -134,8 +134,8 @@ export default function DownloadStep() {
             {/* Progress Bar */}
             <div className="glass-dark rounded-xl p-6 mb-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-white font-semibold">Загрузка...</span>
-                <span className="text-primary-400 font-bold">{downloadProgress}%</span>
+                <span className="text-adaptive-primary font-semibold">Загрузка...</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">{downloadProgress}%</span>
               </div>
               
               <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden">
@@ -157,10 +157,10 @@ export default function DownloadStep() {
             {/* Success Message */}
             <div className="glass-dark rounded-xl p-6 text-center border-2 border-green-500/50 glow-success">
               <div className="text-6xl mb-4">✅</div>
-              <h3 className="text-2xl font-bold text-green-400 mb-2">
+              <h3 className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
                 Загрузка завершена!
               </h3>
-              <p className="text-gray-300">
+              <p className="text-adaptive-secondary font-medium">
                 Переходим к активации подписки...
               </p>
             </div>
@@ -180,21 +180,21 @@ export default function DownloadStep() {
         {/* Instructions */}
         {!isDownloading && (
           <div className="glass-dark rounded-xl p-6 mt-6">
-            <h3 className="text-lg font-semibold text-white mb-3">
+            <h3 className="text-lg font-bold text-adaptive-primary mb-3">
               📋 Инструкция:
             </h3>
-            <ol className="space-y-2 text-gray-300">
+            <ol className="space-y-2 text-adaptive-secondary">
               <li className="flex gap-2">
-                <span className="text-primary-400 font-bold">1.</span>
-                <span>Нажмите кнопку "Скачать приложение"</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">1.</span>
+                <span className="font-medium">Нажмите кнопку "Скачать приложение"</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-primary-400 font-bold">2.</span>
-                <span>Установите приложение на ваше устройство</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">2.</span>
+                <span className="font-medium">Установите приложение на ваше устройство</span>
               </li>
               <li className="flex gap-2">
-                <span className="text-primary-400 font-bold">3.</span>
-                <span>Вернитесь сюда для активации подписки</span>
+                <span className="text-primary-600 dark:text-primary-400 font-bold">3.</span>
+                <span className="font-medium">Вернитесь сюда для активации подписки</span>
               </li>
             </ol>
           </div>

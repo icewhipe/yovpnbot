@@ -26,7 +26,7 @@ export default function MainApp() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="spinner mb-4" />
-          <p className="text-gray-400">Загрузка...</p>
+          <p className="text-adaptive-secondary font-semibold">Загрузка...</p>
         </div>
       </div>
     );

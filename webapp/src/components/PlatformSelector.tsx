@@ -116,7 +116,7 @@ export default function PlatformSelector() {
         {/* Subtitle */}
         <p
           ref={subtitleRef}
-          className="text-center text-gray-400 mb-12 text-lg"
+          className="text-center text-adaptive-secondary mb-12 text-lg font-medium"
         >
           Выберите устройство для установки v2raytun
         </p>
@@ -146,12 +146,12 @@ export default function PlatformSelector() {
               </div>
               
               {/* Name */}
-              <h3 className="text-lg font-semibold text-white mb-2">
+              <h3 className="text-lg font-bold text-adaptive-primary mb-2">
                 {platform.name}
               </h3>
               
               {/* Description */}
-              <p className="text-xs text-gray-400 text-center">
+              <p className="text-xs text-adaptive-tertiary text-center font-medium">
                 {platform.description}
               </p>
             </div>
