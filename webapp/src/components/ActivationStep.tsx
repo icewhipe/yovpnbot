@@ -178,29 +178,29 @@ export default function ActivationStep() {
 
             {/* Error Message */}
             {error && (
-              <div className="glass-dark rounded-xl p-4 mb-6 border-2 border-red-500/50 text-center">
-                <p className="text-red-600 dark:text-red-400 font-semibold">{error}</p>
+              <div className="glass-dark rounded-xl p-4 mb-6 border-2 border-red-500/70 text-center shadow-xl">
+                <p className="text-red-500 dark:text-red-400 font-bold text-lg">{error}</p>
               </div>
             )}
 
             {/* Subscription Info */}
             {subscription && !error && (
-              <div className="glass-dark rounded-xl p-6 mb-6">
-                <h3 className="text-lg font-bold text-adaptive-primary mb-3">
+              <div className="glass-dark rounded-xl p-6 mb-6 border border-primary-500/30 shadow-xl">
+                <h3 className="text-xl font-bold text-adaptive-primary mb-4">
                   ℹ️ Информация о подписке
                 </h3>
-                <div className="space-y-2 text-sm">
+                <div className="space-y-3 text-base">
                   <div className="flex justify-between">
-                    <span className="text-adaptive-tertiary font-medium">Платформа:</span>
+                    <span className="text-adaptive-secondary font-semibold">Платформа:</span>
                     <span className="text-adaptive-primary font-bold">{platform.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-adaptive-tertiary font-medium">Статус:</span>
-                    <span className="text-green-600 dark:text-green-400 font-bold">✓ Активна</span>
+                    <span className="text-adaptive-secondary font-semibold">Статус:</span>
+                    <span className="text-green-500 dark:text-green-400 font-bold">✓ Активна</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-adaptive-tertiary font-medium">Действует до:</span>
-                    <span className="text-adaptive-primary font-semibold">{new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}</span>
+                    <span className="text-adaptive-secondary font-semibold">Действует до:</span>
+                    <span className="text-adaptive-primary font-bold">{new Date(subscription.expiresAt).toLocaleDateString('ru-RU')}</span>
                   </div>
                 </div>
               </div>
@@ -224,11 +224,11 @@ export default function ActivationStep() {
 
             {/* Activating State */}
             {isActivating && (
-              <div className="glass-dark rounded-xl p-8 mb-4 text-center">
+              <div className="glass-dark rounded-xl p-8 mb-4 text-center border-2 border-primary-500/40 shadow-xl">
                 <div className="spinner mb-4 mx-auto" />
-                <p className="text-adaptive-primary font-bold text-lg">Активация...</p>
-                <p className="text-adaptive-secondary text-sm mt-2 font-medium">
-                  {copied ? 'URI скопирован в буфер обмена' : 'Открываем приложение...'}
+                <p className="text-adaptive-primary font-bold text-xl">Активация...</p>
+                <p className="text-adaptive-secondary text-base mt-2 font-semibold">
+                  {copied ? '✅ URI скопирован в буфер обмена' : 'Открываем приложение...'}
                 </p>
               </div>
             )}
@@ -245,26 +245,26 @@ export default function ActivationStep() {
 
             {/* Manual Instructions */}
             {!isActivating && (
-              <div className="glass-dark rounded-xl p-6">
-                <h3 className="text-lg font-bold text-adaptive-primary mb-3">
+              <div className="glass-dark rounded-xl p-6 border border-primary-500/30 shadow-lg">
+                <h3 className="text-lg font-bold text-adaptive-primary mb-4">
                   📖 Если автоматическая активация не сработала:
                 </h3>
-                <ol className="space-y-2 text-adaptive-secondary text-sm">
-                  <li className="flex gap-2">
-                    <span className="text-primary-600 dark:text-primary-400 font-bold">1.</span>
-                    <span className="font-medium">Скопируйте URI вручную (кнопка выше)</span>
+                <ol className="space-y-3 text-adaptive-primary text-sm">
+                  <li className="flex gap-3">
+                    <span className="text-primary-500 dark:text-primary-400 font-bold">1.</span>
+                    <span className="font-semibold">Скопируйте URI вручную (кнопка выше)</span>
                   </li>
-                  <li className="flex gap-2">
-                    <span className="text-primary-600 dark:text-primary-400 font-bold">2.</span>
-                    <span className="font-medium">Откройте приложение v2raytun</span>
+                  <li className="flex gap-3">
+                    <span className="text-primary-500 dark:text-primary-400 font-bold">2.</span>
+                    <span className="font-semibold">Откройте приложение v2raytun</span>
                   </li>
-                  <li className="flex gap-2">
-                    <span className="text-primary-600 dark:text-primary-400 font-bold">3.</span>
-                    <span className="font-medium">Найдите опцию "Импорт конфигурации"</span>
+                  <li className="flex gap-3">
+                    <span className="text-primary-500 dark:text-primary-400 font-bold">3.</span>
+                    <span className="font-semibold">Найдите опцию "Импорт конфигурации"</span>
                   </li>
-                  <li className="flex gap-2">
-                    <span className="text-primary-600 dark:text-primary-400 font-bold">4.</span>
-                    <span className="font-medium">Вставьте скопированный URI</span>
+                  <li className="flex gap-3">
+                    <span className="text-primary-500 dark:text-primary-400 font-bold">4.</span>
+                    <span className="font-semibold">Вставьте скопированный URI</span>
                   </li>
                 </ol>
               </div>
@@ -285,11 +285,11 @@ export default function ActivationStep() {
               Ваша подписка успешно подключена к v2raytun
             </p>
 
-            <div className="glass-dark rounded-xl p-8 mb-8 border-2 border-green-500/50 glow-success">
-              <h3 className="text-2xl font-bold text-green-600 dark:text-green-400 mb-4">
+            <div className="glass-dark rounded-xl p-8 mb-8 border-2 border-green-500/70 glow-success shadow-2xl">
+              <h3 className="text-2xl font-bold text-green-500 dark:text-green-400 mb-4">
                 🎉 Всё готово!
               </h3>
-              <p className="text-adaptive-secondary font-medium">
+              <p className="text-adaptive-primary font-semibold text-lg">
                 Теперь вы можете пользоваться защищённым VPN-соединением
               </p>
             </div>

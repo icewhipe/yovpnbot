@@ -15,9 +15,9 @@ export default function MainApp() {
   useEffect(() => {
     // Set background color based on theme
     if (colorScheme === 'dark') {
-      document.body.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)';
+      document.body.style.background = 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)';
     } else {
-      document.body.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)';
+      document.body.style.background = 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%)';
     }
   }, [colorScheme]);
 
@@ -36,9 +36,9 @@ export default function MainApp() {
     <div className="relative min-h-screen overflow-hidden">
       {/* Background Elements */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary-500/10 via-transparent to-primary-700/10" />
-        <div className="absolute top-20 right-10 w-72 h-72 bg-primary-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 left-10 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary-500/15 via-transparent to-primary-700/15" />
+        <div className="absolute top-20 right-10 w-72 h-72 bg-primary-400/30 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 left-10 w-96 h-96 bg-primary-500/30 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
 
       {/* Main Content */}
