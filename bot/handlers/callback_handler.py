@@ -173,7 +173,8 @@ async def handle_referrals(callback: CallbackQuery, **kwargs):
         referral_code = user.get('referral_code', f"ref_{user_id}")
         
         # Создаем реферальную ссылку
-        bot_username = callback.bot.get_me().username
+        bot_me = await callback.bot.get_me()
+        bot_username = bot_me.username
         referral_link = f"https://t.me/{bot_username}?start={referral_code}"
         
         message_text = f"""

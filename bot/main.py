@@ -60,17 +60,22 @@ class YoVPNBot:
             default=DefaultBotProperties(parse_mode=ParseMode.HTML)
         )
         self.dp = Dispatcher(storage=MemoryStorage())
+        
+        # Создаем сервисы ОДИН РАЗ
         self.services = BotServices(self.bot)
         
-        # Регистрируем middleware и обработчики
-        register_middleware(self.dp)
+        # Регистрируем middleware с готовыми сервисами
+        register_middleware(self.dp, self.services)
+        
+        # Регистрируем обработчики
         register_handlers(self.dp)
         
-        # Инициализируем админ панель
+        # Инициализируем админ панель с ВСЕМИ сервисами
         init_admin_panel(
             self.services.user_service,
             self.services.marzban_service,
-            self.services.ui_service
+            self.services.ui_service,
+            self.services.animation_service  # ИСПРАВЛЕНО: добавлен animation_service
         )
         
         logger.info("YoVPN Bot инициализирован")

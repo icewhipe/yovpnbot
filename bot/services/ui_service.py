@@ -33,39 +33,49 @@ class UIService:
     
     def create_main_menu_keyboard(self) -> InlineKeyboardMarkup:
         """
-        Создать клавиатуру главного меню
+        Создать клавиатуру главного меню с современным дизайном 2025-2026
+        
+        Особенности:
+        - Яркие эмодзи для визуальной привлекательности
+        - Интуитивно понятная структура
+        - Акцент на основных действиях
         
         Returns:
             InlineKeyboardMarkup: Клавиатура главного меню
         """
         keyboard = [
+            # Основные действия (крупные кнопки)
             [
                 InlineKeyboardButton(
-                    text=f"{EMOJI['subscription']} Мои подписки",
+                    text=f"🔐 Мои подписки",
                     callback_data="my_subscriptions"
-                ),
+                )
+            ],
+            [
                 InlineKeyboardButton(
-                    text=f"{EMOJI['payment']} Пополнить",
+                    text=f"💎 Пополнить баланс",
                     callback_data="top_up"
                 )
             ],
+            # Дополнительные функции (две в ряд)
             [
                 InlineKeyboardButton(
-                    text=f"{EMOJI['referral']} Рефералы",
+                    text=f"🎁 Рефералы",
                     callback_data="referrals"
                 ),
                 InlineKeyboardButton(
-                    text=f"{EMOJI['history']} Статистика",
+                    text=f"📊 Статистика",
                     callback_data="stats"
                 )
             ],
+            # Настройки и поддержка
             [
                 InlineKeyboardButton(
-                    text=f"{EMOJI['settings']} Настройки",
+                    text=f"⚙️ Настройки",
                     callback_data="settings"
                 ),
                 InlineKeyboardButton(
-                    text=f"{EMOJI['support']} Поддержка",
+                    text=f"🆘 Поддержка",
                     callback_data="support"
                 )
             ]
@@ -132,7 +142,12 @@ class UIService:
     
     def create_payment_keyboard(self, amounts: List[float] = None) -> InlineKeyboardMarkup:
         """
-        Создать клавиатуру для выбора суммы платежа
+        Создать клавиатуру для выбора суммы платежа (UX 2025-2026)
+        
+        Особенности:
+        - Популярные суммы выделены
+        - Показываем эквивалент в днях
+        - Визуально привлекательные эмодзи
         
         Args:
             amounts: Список сумм для отображения
@@ -145,6 +160,15 @@ class UIService:
         
         keyboard = []
         
+        # Эмодзи для разных диапазонов сумм
+        emoji_map = {
+            40: "🥉",   # Бронза
+            80: "🥈",   # Серебро
+            120: "🥇",  # Золото
+            200: "💎",  # Платина
+            400: "👑"   # Премиум
+        }
+        
         # Создаем кнопки для каждой суммы
         for i in range(0, len(amounts), 2):
             row = []
@@ -152,17 +176,32 @@ class UIService:
                 if i + j < len(amounts):
                     amount = amounts[i + j]
                     days = int(amount / 4)
-                    text = f"{EMOJI['money']} {amount:.0f}₽ ({days}д)"
+                    emoji = emoji_map.get(amount, "💰")
+                    
+                    # Особый текст для популярных сумм
+                    if amount == 120:
+                        text = f"{emoji} {amount:.0f}₽ 🔥 ({days}д)"  # Популярный выбор
+                    else:
+                        text = f"{emoji} {amount:.0f}₽ ({days}д)"
+                    
                     row.append(InlineKeyboardButton(
                         text=text,
                         callback_data=f"pay_{amount}"
                     ))
             keyboard.append(row)
         
+        # Добавляем кнопку "Другая сумма"
+        keyboard.append([
+            InlineKeyboardButton(
+                text=f"✏️ Ввести свою сумму",
+                callback_data="pay_custom"
+            )
+        ])
+        
         # Добавляем кнопку "Назад"
         keyboard.append([
             InlineKeyboardButton(
-                text=f"{EMOJI['back']} Назад",
+                text=f"⬅️ Назад",
                 callback_data="main_menu"
             )
         ])

@@ -7,8 +7,10 @@ import json
 import logging
 from typing import Optional, Dict, Any
 from pathlib import Path
+from .cache_service import get_cache
 
 logger = logging.getLogger(__name__)
+cache = get_cache()
 
 class UserService:
     """
@@ -49,11 +51,18 @@ class UserService:
             return {}
     
     def _save_users(self):
-        """Сохранить пользователей в файл"""
+        """
+        Сохранить пользователей в файл и инвалидировать кэш
+        """
         try:
             with open(self.data_file, 'w', encoding='utf-8') as f:
                 json.dump(self.users, f, ensure_ascii=False, indent=2)
-            logger.debug("💾 Пользователи сохранены")
+            
+            # Инвалидируем кэш пользователей
+            cache.delete_pattern("user:")
+            cache.delete_pattern("user_stats:")
+            
+            logger.debug("💾 Пользователи сохранены, кэш инвалидирован")
         except Exception as e:
             logger.error(f"❌ Ошибка сохранения пользователей: {e}")
     
@@ -104,7 +113,7 @@ class UserService:
     
     async def get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
-        Получить данные пользователя
+        Получить данные пользователя (с кэшированием)
         
         Args:
             user_id: ID пользователя
@@ -112,7 +121,20 @@ class UserService:
         Returns:
             Optional[Dict]: Данные пользователя или None
         """
-        return self.users.get(user_id)
+        # Проверяем кэш
+        cache_key = f"user:{user_id}"
+        cached_user = cache.get(cache_key)
+        if cached_user is not None:
+            return cached_user
+        
+        # Получаем из БД
+        user = self.users.get(user_id)
+        
+        # Сохраняем в кэш
+        if user:
+            cache.set(cache_key, user, ttl=60)  # Кэш на 1 минуту
+        
+        return user
     
     async def get_or_create_user(self, user_id: int, username: Optional[str] = None, first_name: str = "Пользователь") -> Dict[str, Any]:
         """
