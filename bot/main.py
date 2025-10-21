@@ -34,10 +34,6 @@ from src.config import config
 from bot.handlers import register_handlers, init_admin_panel
 from bot.middleware import register_middleware
 from bot.services import BotServices
-from bot.handlers import webapp_handler
-
-# Регистрация хендлера
-dp.include_router(webapp_handler.router)
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_TO_FILE = os.getenv("LOG_TO_FILE", "0") == "1"

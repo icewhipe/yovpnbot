@@ -132,5 +132,9 @@ async def activate_subscription(
 
 @router.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "YoVPN WebApp API"}
+    """Health check endpoint for Railway and monitoring"""
+    return {
+        "status": "healthy",
+        "service": "YoVPN WebApp API",
+        "version": "1.0.0"
+    }
