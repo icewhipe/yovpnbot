@@ -132,16 +132,16 @@ export default function DownloadStep() {
         ) : isDownloading && !isDownloaded ? (
           <div className="mb-6">
             {/* Progress Bar */}
-            <div className="glass-dark rounded-xl p-6 mb-4">
+            <div className="glass-dark rounded-xl p-6 mb-4 border-2 border-primary-500/40">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-adaptive-primary font-semibold">Загрузка...</span>
-                <span className="text-primary-600 dark:text-primary-400 font-bold">{downloadProgress}%</span>
+                <span className="text-adaptive-primary font-bold text-lg">Загрузка...</span>
+                <span className="text-primary-500 dark:text-primary-400 font-bold text-xl">{downloadProgress}%</span>
               </div>
               
-              <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden">
+              <div className="w-full h-4 bg-slate-700/80 dark:bg-slate-800/90 rounded-full overflow-hidden border border-slate-600/60">
                 <div
                   ref={progressRef}
-                  className="h-full bg-gradient-to-r from-primary-500 to-primary-600 shimmer"
+                  className="h-full bg-gradient-to-r from-primary-500 to-primary-400 shimmer shadow-lg"
                   style={{ width: '0%' }}
                 />
               </div>
@@ -155,12 +155,12 @@ export default function DownloadStep() {
         ) : (
           <div className="mb-6">
             {/* Success Message */}
-            <div className="glass-dark rounded-xl p-6 text-center border-2 border-green-500/50 glow-success">
+            <div className="glass-dark rounded-xl p-6 text-center border-2 border-green-500/70 glow-success shadow-2xl">
               <div className="text-6xl mb-4">✅</div>
-              <h3 className="text-2xl font-bold text-green-600 dark:text-green-400 mb-2">
+              <h3 className="text-2xl font-bold text-green-500 dark:text-green-400 mb-2">
                 Загрузка завершена!
               </h3>
-              <p className="text-adaptive-secondary font-medium">
+              <p className="text-adaptive-primary font-semibold text-lg">
                 Переходим к активации подписки...
               </p>
             </div>
@@ -179,22 +179,22 @@ export default function DownloadStep() {
 
         {/* Instructions */}
         {!isDownloading && (
-          <div className="glass-dark rounded-xl p-6 mt-6">
-            <h3 className="text-lg font-bold text-adaptive-primary mb-3">
+          <div className="glass-dark rounded-xl p-6 mt-6 border border-primary-500/30 shadow-lg">
+            <h3 className="text-xl font-bold text-adaptive-primary mb-4">
               📋 Инструкция:
             </h3>
-            <ol className="space-y-2 text-adaptive-secondary">
-              <li className="flex gap-2">
-                <span className="text-primary-600 dark:text-primary-400 font-bold">1.</span>
-                <span className="font-medium">Нажмите кнопку "Скачать приложение"</span>
+            <ol className="space-y-3 text-adaptive-primary">
+              <li className="flex gap-3">
+                <span className="text-primary-500 dark:text-primary-400 font-bold text-lg">1.</span>
+                <span className="font-semibold">Нажмите кнопку "Скачать приложение"</span>
               </li>
-              <li className="flex gap-2">
-                <span className="text-primary-600 dark:text-primary-400 font-bold">2.</span>
-                <span className="font-medium">Установите приложение на ваше устройство</span>
+              <li className="flex gap-3">
+                <span className="text-primary-500 dark:text-primary-400 font-bold text-lg">2.</span>
+                <span className="font-semibold">Установите приложение на ваше устройство</span>
               </li>
-              <li className="flex gap-2">
-                <span className="text-primary-600 dark:text-primary-400 font-bold">3.</span>
-                <span className="font-medium">Вернитесь сюда для активации подписки</span>
+              <li className="flex gap-3">
+                <span className="text-primary-500 dark:text-primary-400 font-bold text-lg">3.</span>
+                <span className="font-semibold">Вернитесь сюда для активации подписки</span>
               </li>
             </ol>
           </div>

@@ -23,10 +23,23 @@ const config: Config = {
           800: '#075985',
           900: '#0c4a6e',
         },
+        // Better slate colors for better visibility
+        slate: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+        },
         // Glassmorphism background
         glass: {
-          light: 'rgba(255, 255, 255, 0.7)',
-          dark: 'rgba(0, 0, 0, 0.7)',
+          light: 'rgba(255, 255, 255, 0.98)',
+          dark: 'rgba(30, 41, 59, 0.98)',
         },
       },
       backgroundImage: {

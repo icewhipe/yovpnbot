@@ -130,15 +130,16 @@ export default function PlatformSelector() {
               className={cn(
                 'platform-card glass-dark rounded-2xl p-6 cursor-pointer',
                 'flex flex-col items-center justify-center',
-                'hover:border-primary-500/50 transition-colors duration-300',
-                'relative overflow-hidden'
+                'hover:border-primary-400 transition-all duration-300',
+                'relative overflow-hidden',
+                'shadow-xl hover:shadow-2xl'
               )}
               onClick={() => handlePlatformSelect(platform.id)}
               onMouseEnter={() => handleCardHover(index, true)}
               onMouseLeave={() => handleCardHover(index, false)}
             >
               {/* Background glow */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary-500/10 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-br from-primary-400/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
               
               {/* Icon */}
               <div className="text-6xl mb-4 transform transition-transform duration-300 hover:scale-110">
@@ -159,8 +160,8 @@ export default function PlatformSelector() {
         </div>
 
         {/* Decorative elements */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-500/20 rounded-full blur-3xl opacity-20 animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary-600/20 rounded-full blur-3xl opacity-20 animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-primary-400/30 rounded-full blur-3xl opacity-30 animate-pulse" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary-500/30 rounded-full blur-3xl opacity-30 animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
     </div>
   );
