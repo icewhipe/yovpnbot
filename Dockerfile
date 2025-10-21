@@ -19,10 +19,10 @@ RUN groupadd -r yovpn && useradd -r -g yovpn yovpn
 WORKDIR /app
 
 # Копируем файлы зависимостей
-COPY requirements.txt .
+COPY requirements-prod.txt .
 
-# Устанавливаем Python зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+# Устанавливаем Python зависимости (только production)
+RUN pip install --no-cache-dir -r requirements-prod.txt
 
 # Этап 2: Сборка приложения
 FROM base as builder

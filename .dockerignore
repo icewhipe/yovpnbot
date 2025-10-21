@@ -1,0 +1,91 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+docs/
+CHANGELOG.md
+CONTRIBUTING.md
+LICENSE
+
+# Tests
+tests/
+*.test.py
+
+# Development files
+requirements-dev.txt
+.env.example
+.env.local
+.env.development
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Database files (will be created at runtime)
+*.db
+*.sqlite
+*.sqlite3
+
+# Node modules (if any)
+node_modules/
+
+# Railway specific
+.railway/
+railway.toml
+railway.json
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Monitoring configs (will be mounted)
+monitoring/
+
+# Nginx configs (separate service)
+nginx/
+nginx.conf
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
