@@ -75,7 +75,7 @@ class MarzbanService:
         
         Args:
             username: Имя пользователя
-            user_data: Данные пользователя
+            user_data: Данные пользователя (expire, data_limit, status, days)
         
         Returns:
             Optional[Dict]: Данные созданного пользователя
@@ -87,33 +87,59 @@ class MarzbanService:
         try:
             session = await self._get_session()
             
-            # Данные для создания пользователя
+            # Генерируем UUID для VLESS
+            vless_uuid = user_data.get('vless_id', self._generate_uuid())
+            
+            # Рассчитываем дату истечения на основе дней
+            import time
+            from datetime import datetime, timedelta
+            
+            days = user_data.get('days', 0)
+            if days > 0:
+                expire_timestamp = int((datetime.now() + timedelta(days=days)).timestamp())
+            else:
+                expire_timestamp = user_data.get('expire', 0)  # 0 = без ограничений
+            
+            # Данные для создания пользователя с VLESS TCP REALITY
             payload = {
                 "username": username,
                 "proxies": {
                     "vless": {
-                        "id": user_data.get('vless_id', self._generate_uuid()),
+                        "id": vless_uuid,
                         "flow": "xtls-rprx-vision"
                     }
                 },
-                "expire": user_data.get('expire', 0),  # 0 = без ограничений
+                "inbounds": {
+                    "vless": [
+                        "VLESS TCP REALITY",
+                        "VLESS GRPC REALITY"
+                    ]
+                },
+                "expire": expire_timestamp,
                 "data_limit": user_data.get('data_limit', 0),  # 0 = безлимит
+                "data_limit_reset_strategy": "no_reset",
                 "status": user_data.get('status', 'active'),
-                "note": user_data.get('note', f"Создан через YoVPN Bot")
+                "note": user_data.get('note', f"Создан через YoVPN Bot - {days} дней")
             }
+            
+            logger.info(f"🔄 Создание пользователя {username} с параметрами: days={days}, expire={expire_timestamp}")
+            logger.debug(f"Payload: {payload}")
             
             async with session.post(f"{self.api_url}/user", json=payload) as response:
                 if response.status == 200:
                     result = await response.json()
-                    logger.info(f"✅ Пользователь {username} создан в Marzban")
+                    logger.info(f"✅ Пользователь {username} создан в Marzban (VLESS TCP REALITY)")
                     return result
                 else:
                     error_text = await response.text()
-                    logger.error(f"❌ Ошибка создания пользователя {username}: {error_text}")
+                    logger.error(f"❌ Ошибка создания пользователя {username}: HTTP {response.status}")
+                    logger.error(f"Детали ошибки: {error_text}")
                     return None
                     
         except Exception as e:
             logger.error(f"❌ Ошибка создания пользователя в Marzban: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     async def update_user(self, username: str, updates: Dict[str, Any]) -> bool:
