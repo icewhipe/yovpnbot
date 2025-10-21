@@ -75,7 +75,8 @@ class AnimationService:
             message,
             welcome_text,
             'heart',
-            reply_markup=self._get_main_menu_keyboard()
+            reply_markup=self._get_main_menu_keyboard(),
+            parse_mode='HTML'
         )
     
     async def send_subscription_activated(self, message: Message, days: int) -> Message:
@@ -109,7 +110,8 @@ class AnimationService:
             message,
             activation_text,
             'fire',
-            reply_markup=self._get_subscription_menu_keyboard()
+            reply_markup=self._get_subscription_menu_keyboard(),
+            parse_mode='HTML'
         )
     
     async def send_payment_success(self, message: Message, amount: float, days: int) -> Message:
@@ -142,7 +144,8 @@ class AnimationService:
             message,
             payment_text,
             'confetti',
-            reply_markup=self._get_payment_success_keyboard()
+            reply_markup=self._get_payment_success_keyboard(),
+            parse_mode='HTML'
         )
     
     async def send_loading_message(self, message: Message, text: str) -> Message:
@@ -159,7 +162,8 @@ class AnimationService:
         return await self.reply_with_effect(
             message,
             text,
-            'loading'
+            'loading',
+            parse_mode='HTML'
         )
     
     async def send_error_message(self, message: Message, error_text: str, is_critical: bool = False) -> Message:
@@ -179,7 +183,8 @@ class AnimationService:
         return await self.reply_with_effect(
             message,
             error_text,
-            effect
+            effect,
+            parse_mode='HTML'
         )
     
     async def reply_with_effect(self, message: Message, text: str, effect_name: str, **kwargs) -> Message:
@@ -195,6 +200,10 @@ class AnimationService:
         Returns:
             Message: Отправленное сообщение
         """
+        # Устанавливаем parse_mode по умолчанию, если не указан
+        if 'parse_mode' not in kwargs:
+            kwargs['parse_mode'] = 'HTML'
+        
         try:
             effect_id = get_effect_id(effect_name)
             
@@ -235,6 +244,10 @@ class AnimationService:
         Returns:
             Message: Отправленное сообщение
         """
+        # Устанавливаем parse_mode по умолчанию, если не указан
+        if 'parse_mode' not in kwargs:
+            kwargs['parse_mode'] = 'HTML'
+        
         try:
             effect_id = get_effect_id(effect_name)
             
@@ -251,7 +264,7 @@ class AnimationService:
                     logger.debug(f"Эффект '{effect_name}' недоступен, используем fallback эмодзи")
                     return await self.bot.send_message(chat_id, enhanced_text, **kwargs)
             else:
-                # Если эффект не найден, добавляем fallback эмоджи
+                # Если эффект не найден, добавляем fallback эмодзи
                 fallback_emoji = get_fallback_emoji(effect_name)
                 enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
                 logger.debug(f"Эффект '{effect_name}' не найден, используем fallback эмодзи")
