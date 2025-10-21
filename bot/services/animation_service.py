@@ -208,13 +208,13 @@ class AnimationService:
                     # Если эффект не работает, добавляем fallback эмодзи и отправляем без эффекта
                     fallback_emoji = get_fallback_emoji(effect_name)
                     enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
-                    logger.warning(f"⚠️ Эффект '{effect_name}' недоступен: {effect_error}. Используем fallback эмодзи.")
+                    logger.debug(f"Эффект '{effect_name}' недоступен, используем fallback эмодзи")
                     return await message.reply(enhanced_text, **kwargs)
             else:
                 # Если эффект не найден, добавляем fallback эмодзи
                 fallback_emoji = get_fallback_emoji(effect_name)
                 enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
-                logger.warning(f"⚠️ Эффект '{effect_name}' не найден. Используем fallback эмодзи.")
+                logger.debug(f"Эффект '{effect_name}' не найден, используем fallback эмодзи")
                 return await message.reply(enhanced_text, **kwargs)
             
         except Exception as e:
@@ -248,13 +248,13 @@ class AnimationService:
                     # Если эффект не работает, добавляем fallback эмодзи и отправляем без эффекта
                     fallback_emoji = get_fallback_emoji(effect_name)
                     enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
-                    logger.warning(f"⚠️ Эффект '{effect_name}' недоступен: {effect_error}. Используем fallback эмодзи.")
+                    logger.debug(f"Эффект '{effect_name}' недоступен, используем fallback эмодзи")
                     return await self.bot.send_message(chat_id, enhanced_text, **kwargs)
             else:
-                # Если эффект не найден, добавляем fallback эмодзи
+                # Если эффект не найден, добавляем fallback эмоджи
                 fallback_emoji = get_fallback_emoji(effect_name)
                 enhanced_text = f"{fallback_emoji} {text}" if fallback_emoji else text
-                logger.warning(f"⚠️ Эффект '{effect_name}' не найден. Используем fallback эмодзи.")
+                logger.debug(f"Эффект '{effect_name}' не найден, используем fallback эмодзи")
                 return await self.bot.send_message(chat_id, enhanced_text, **kwargs)
             
         except Exception as e:
