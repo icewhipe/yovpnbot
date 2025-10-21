@@ -15,6 +15,7 @@ import asyncio
 import logging
 import sys
 import os
+import fcntl
 from pathlib import Path
 
 # Добавляем корневую папку в путь
@@ -50,6 +51,38 @@ else:
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
+
+# Файл блокировки для предотвращения запуска нескольких экземпляров
+LOCK_FILE = "/tmp/yovpn_bot.lock"
+lock_file_handle = None
+
+def acquire_lock():
+    """Получить эксклюзивную блокировку для предотвращения запуска нескольких экземпляров"""
+    global lock_file_handle
+    try:
+        lock_file_handle = open(LOCK_FILE, 'w')
+        fcntl.flock(lock_file_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_file_handle.write(str(os.getpid()))
+        lock_file_handle.flush()
+        logger.info(f"✅ Блокировка получена (PID: {os.getpid()})")
+        return True
+    except IOError:
+        logger.error("❌ Другой экземпляр бота уже запущен!")
+        logger.error("⚠️ Убедитесь, что запущен только один экземпляр бота с этим токеном.")
+        return False
+
+def release_lock():
+    """Освободить блокировку"""
+    global lock_file_handle
+    if lock_file_handle:
+        try:
+            fcntl.flock(lock_file_handle, fcntl.LOCK_UN)
+            lock_file_handle.close()
+            if os.path.exists(LOCK_FILE):
+                os.remove(LOCK_FILE)
+            logger.info("✅ Блокировка освобождена")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при освобождении блокировки: {e}")
 
 class YoVPNBot:
     """
@@ -125,6 +158,16 @@ class YoVPNBot:
 
 async def main():
     """Главная функция"""
+    # Проверяем, не запущен ли уже другой экземпляр
+    if not acquire_lock():
+        logger.error("🚫 Запуск отменен: обнаружен конфликт с другим экземпляром бота")
+        logger.error("💡 Решение проблемы:")
+        logger.error("   1. Остановите все запущенные экземпляры бота")
+        logger.error("   2. Проверьте Docker контейнеры: docker ps | grep bot")
+        logger.error("   3. Проверьте процессы: ps aux | grep 'bot/main.py'")
+        logger.error("   4. Убедитесь, что бот не запущен на другом сервере с тем же токеном")
+        sys.exit(1)
+    
     bot = YoVPNBot()
     
     try:
@@ -135,12 +178,15 @@ async def main():
         logger.error(f"❌ Критическая ошибка: {e}")
     finally:
         await bot.stop()
+        release_lock()
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("👋 До свидания!")
+        release_lock()
     except Exception as e:
         logger.error(f"💥 Фатальная ошибка: {e}")
+        release_lock()
         sys.exit(1)

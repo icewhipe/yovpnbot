@@ -88,6 +88,14 @@ async def handle_activate_subscription(callback: CallbackQuery, **kwargs):
         marzban_service = services.get_marzban_service()
         animation_service = services.get_animation_service()
         
+        # Проверяем доступность Marzban API
+        if not await marzban_service.check_api_availability():
+            await callback.answer(
+                "❌ Сервис VPN временно недоступен. Попробуйте позже.",
+                show_alert=True
+            )
+            return
+        
         # Проверяем баланс
         balance = await user_service.get_user_balance(user_id)
         if balance < 4.0:
@@ -97,8 +105,10 @@ async def handle_activate_subscription(callback: CallbackQuery, **kwargs):
             )
             return
         
-        # Рассчитываем количество дней
+        # Рассчитываем количество дней на основе баланса (4₽ = 1 день)
         days = int(balance / 4)
+        
+        logger.info(f"💰 Баланс пользователя {user_id}: {balance}₽, доступно дней: {days}")
         
         # Получаем данные пользователя
         user = await user_service.get_or_create_user(
@@ -107,34 +117,81 @@ async def handle_activate_subscription(callback: CallbackQuery, **kwargs):
             first_name=callback.from_user.first_name or "Пользователь"
         )
         
-        # Создаем пользователя в Marzban
-        username = user.get('username', f"user_{user_id}")
-        marzban_user = await marzban_service.create_user(username, {
-            'expire': 0,  # Без ограничений по времени
-            'data_limit': 0,  # Безлимит трафика
-            'status': 'active'
-        })
-        
-        if marzban_user:
-            # Активируем подписку
-            await user_service.activate_subscription(user_id, days)
-            
-            # Отправляем сообщение об успехе с эффектом
-            await animation_service.send_subscription_activated(
-                callback.message, 
-                days
-            )
-            
-            logger.info(f"✅ Подписка активирована для пользователя {user_id}: {days} дней")
+        # Формируем имя пользователя для Marzban (по username телеграма)
+        tg_username = callback.from_user.username
+        if tg_username:
+            marzban_username = tg_username.lstrip('@')
         else:
-            await callback.answer(
-                "❌ Ошибка создания пользователя в Marzban. Попробуйте позже.",
-                show_alert=True
-            )
+            marzban_username = f"user_{user_id}"
+        
+        logger.info(f"🔄 Создание/обновление пользователя {marzban_username} в Marzban")
+        
+        # Проверяем, существует ли уже пользователь
+        existing_user = await marzban_service.get_user(marzban_username)
+        
+        if existing_user:
+            # Обновляем существующего пользователя (продлеваем подписку)
+            logger.info(f"👤 Пользователь {marzban_username} уже существует, обновляем...")
+            
+            import time
+            from datetime import datetime, timedelta
+            
+            # Рассчитываем новую дату истечения
+            expire_timestamp = int((datetime.now() + timedelta(days=days)).timestamp())
+            
+            update_result = await marzban_service.update_user(marzban_username, {
+                'expire': expire_timestamp,
+                'status': 'active',
+                'note': f"Обновлено через YoVPN Bot - {days} дней"
+            })
+            
+            if update_result:
+                # Активируем подписку
+                await user_service.activate_subscription(user_id, days)
+                
+                # Отправляем сообщение об успехе
+                await animation_service.send_subscription_activated(
+                    callback.message, 
+                    days
+                )
+                
+                logger.info(f"✅ Подписка продлена для {user_id}: {days} дней")
+            else:
+                await callback.answer(
+                    "❌ Ошибка обновления пользователя в Marzban. Попробуйте позже.",
+                    show_alert=True
+                )
+        else:
+            # Создаем нового пользователя с VLESS TCP REALITY
+            marzban_user = await marzban_service.create_user(marzban_username, {
+                'days': days,  # Передаем количество дней
+                'data_limit': 0,  # Безлимит трафика
+                'status': 'active',
+                'note': f"Telegram ID: {user_id}"
+            })
+            
+            if marzban_user:
+                # Активируем подписку
+                await user_service.activate_subscription(user_id, days)
+                
+                # Отправляем сообщение об успехе с эффектом
+                await animation_service.send_subscription_activated(
+                    callback.message, 
+                    days
+                )
+                
+                logger.info(f"✅ Подписка активирована для пользователя {user_id}: {days} дней")
+            else:
+                await callback.answer(
+                    "❌ Ошибка создания пользователя в Marzban. Проверьте настройки inbounds (VLESS TCP REALITY).",
+                    show_alert=True
+                )
         
     except Exception as e:
         logger.error(f"❌ Ошибка в handle_activate_subscription: {e}")
-        await callback.answer("❌ Произошла ошибка при активации", show_alert=True)
+        import traceback
+        logger.error(traceback.format_exc())
+        await callback.answer("❌ Произошла ошибка при активации. Обратитесь в поддержку.", show_alert=True)
 
 async def handle_setup_vpn(callback: CallbackQuery, **kwargs):
     """
