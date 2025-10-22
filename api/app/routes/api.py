@@ -15,7 +15,7 @@ from app.utils.telegram import validate_telegram_init_data, extract_user_id_from
 from app.services.subscription_service import subscription_service
 from app.config import settings
 
-router = APIRouter(prefix="/api", tags=["api"])
+router = APIRouter(tags=["api"])
 
 
 @router.post("/validate", response_model=ValidationResponse)
