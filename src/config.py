@@ -15,11 +15,12 @@ class Config:
     
     def __init__(self):
         # Telegram Bot Configuration
-        self.BOT_TOKEN = config('USERBOT_TOKEN', default=None)
+        # Поддерживаем оба варианта названия для обратной совместимости
+        self.BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN') or os.environ.get('USERBOT_TOKEN') or config('TELEGRAM_BOT_TOKEN', default=config('USERBOT_TOKEN', default=None))
         
         # Marzban API Configuration
-        self.MARZBAN_API_URL = config('MARZBAN_API_URL', default=None)
-        self.MARZBAN_ADMIN_TOKEN = config('MARZBAN_ADMIN_TOKEN', default=None)
+        self.MARZBAN_API_URL = os.environ.get('MARZBAN_API_URL') or config('MARZBAN_API_URL', default=None)
+        self.MARZBAN_ADMIN_TOKEN = os.environ.get('MARZBAN_ADMIN_TOKEN') or config('MARZBAN_ADMIN_TOKEN', default=None)
         
         # Database Configuration
         self.DB_HOST = config('DB_HOST', default='localhost')
