@@ -22,13 +22,14 @@ class BotConfig:
         """Загрузить конфигурацию из переменных окружения"""
         
         # Основные настройки бота
-        self.BOT_TOKEN = decouple_config('USERBOT_TOKEN', default='')
-        self.BOT_USERNAME = decouple_config('BOT_USERNAME', default='YoVPNBot')
+        # Поддерживаем оба варианта названия для обратной совместимости
+        self.BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN') or os.environ.get('USERBOT_TOKEN') or decouple_config('TELEGRAM_BOT_TOKEN', default=decouple_config('USERBOT_TOKEN', default=''))
+        self.BOT_USERNAME = os.environ.get('BOT_USERNAME') or decouple_config('BOT_USERNAME', default='YoVPNBot')
         self.BOT_DESCRIPTION = decouple_config('BOT_DESCRIPTION', default='Современный VPN-бот с ежедневной оплатой')
         
         # Настройки Marzban
-        self.MARZBAN_API_URL = decouple_config('MARZBAN_API_URL', default='')
-        self.MARZBAN_ADMIN_TOKEN = decouple_config('MARZBAN_ADMIN_TOKEN', default='')
+        self.MARZBAN_API_URL = os.environ.get('MARZBAN_API_URL') or decouple_config('MARZBAN_API_URL', default='')
+        self.MARZBAN_ADMIN_TOKEN = os.environ.get('MARZBAN_ADMIN_TOKEN') or decouple_config('MARZBAN_ADMIN_TOKEN', default='')
         
         # Настройки базы данных
         self.DATA_FILE = decouple_config('DATA_FILE', default='data.json')

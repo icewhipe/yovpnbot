@@ -16,8 +16,8 @@ def check_environment():
     print("🔍 Проверка переменных окружения...")
     
     required_vars = [
-        'USERBOT_TOKEN',
-        'MARZBAN_API_URL', 
+        'TELEGRAM_BOT_TOKEN',  # или USERBOT_TOKEN для обратной совместимости
+        'MARZBAN_API_URL',
         'MARZBAN_ADMIN_TOKEN'
     ]
     
