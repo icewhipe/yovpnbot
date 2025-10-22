@@ -1,22 +1,40 @@
-# Dependencies
-node_modules/
-venv/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 env/
-.venv/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Build outputs
+# Node
+node_modules/
 .next/
 out/
-build/
 dist/
-*.pyc
-__pycache__/
+.cache/
 
-# Environment variables
+# Environment
 .env
 .env.local
+.env.production
 .env.*.local
-!.env.example
 
 # IDE
 .vscode/
@@ -25,43 +43,32 @@ __pycache__/
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-
 # Logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-webapp.log
-api.log
 
-# Testing
-coverage/
-.pytest_cache/
-.coverage
+# OS
+.DS_Store
+Thumbs.db
 
-# Misc
-.turbo
-*.pem
-.vercel
-.cache
+# Database
+*.db
+*.sqlite
+*.sqlite3
 
-# Docker
-docker-compose.override.yml
-
-# Process IDs
-.webapp.pid
-.api.pid
-
-# Certificates
-*.key
-*.crt
-*.pem
-certs/
-
-# User data
-data/
-data.json
+# Temporary
+tmp/
+temp/
 *.tmp
+
+# Coverage
+coverage/
+.coverage
+htmlcov/
+
+# Railway
+.railway/
+

@@ -13,48 +13,68 @@ def get_welcome_text(first_name: str, balance: float, subscription_days: int) ->
     """
     Приветственное сообщение для /start
     Современный стиль с акцентом на визуал и пользу
+    Тренды 2025-2026: чистота, минимализм, читаемость
     """
+    separator = "━━━━━━━━━━━━━━━━━━━━"
+    
     return f"""
-<b>✨ Привет, {first_name}!</b>
+<b>✨ Добро пожаловать, {first_name}!</b>
 
-🔐 <b>YoVPN</b> — твой надёжный VPN-проводник в безопасный интернет
+<blockquote expandable>🔐 <b>YoVPN</b> — современный VPN-сервис нового поколения
 
-╭─────────────────╮
-│  💰 Баланс: <code>{balance:.2f}₽</code>
-│  📅 Доступ: <code>{subscription_days} дн.</code>
-╰─────────────────╯
+Быстрый, безопасный и надёжный доступ к свободному интернету 🌐</blockquote>
 
-<b>Почему выбирают нас:</b>
-• ⚡ Молниеносная скорость
-• 🛡️ Военное шифрование
-• 🌍 Серверы по всему миру
-• 💎 Честная цена — 4₽/день
+{separator}
 
-<i>Выбери нужный раздел ниже</i> 👇
+💰 <b>Ваш баланс:</b> <code>{balance:.2f}₽</code>
+📅 <b>Дней доступа:</b> <code>{subscription_days}</code>
+
+{separator}
+
+<b>🎯 Преимущества YoVPN:</b>
+
+⚡ <b>Скорость</b> — до 1 Гбит/с
+🛡️ <b>Защита</b> — AES-256 шифрование
+🌍 <b>География</b> — серверы в 15+ странах
+💎 <b>Цена</b> — всего 4₽ в день
+
+{separator}
+
+<i>👇 Выберите нужный раздел в меню</i>
 """.strip()
 
 
 def get_new_user_welcome_text(first_name: str) -> str:
     """
     Приветствие для нового пользователя после анимации
+    Современный дизайн с акцентом на быстрый старт
     """
+    separator = "━━━━━━━━━━━━━━━━━━━━"
+    
     return f"""
-<b>🎉 Добро пожаловать, {first_name}!</b>
+<b>🎉 Поздравляем, {first_name}!</b>
 
-Система готова к работе! Мы подарили тебе <b>+15₽</b> на старт 🎁
+<blockquote>Система успешно инициализирована ✅
 
-╭─────────────────╮
-│  💰 Баланс: <code>15.00₽</code>
-│  📅 Доступ: <code>3 дня</code>
-│  🎁 Бонус: <code>активирован</code>
-╰─────────────────╯
+Вы получили приветственный бонус <b>+15₽</b> 🎁</blockquote>
 
-<b>Что дальше?</b>
-1️⃣ Активируй подписку
-2️⃣ Настрой VPN на устройстве
-3️⃣ Наслаждайся свободным интернетом
+{separator}
 
-<i>Выбери действие ниже</i> 👇
+💰 <b>Баланс:</b> <code>15.00₽</code>
+📅 <b>Доступ:</b> <code>3 дня бесплатно</code>
+🎁 <b>Бонус:</b> <code>зачислен</code>
+
+{separator}
+
+<b>🚀 Быстрый старт (3 шага):</b>
+
+<b>1️⃣</b> Активируйте подписку
+<b>2️⃣</b> Настройте VPN на устройстве  
+<b>3️⃣</b> Наслаждайтесь свободным интернетом
+
+{separator}
+
+<i>💡 Нажмите на кнопку ниже для начала</i>
 """.strip()
 
 
@@ -64,23 +84,29 @@ def get_new_user_welcome_text(first_name: str) -> str:
 
 def get_main_menu_text(first_name: str, balance: float, subscription_days: int, subscription_active: bool) -> str:
     """
-    Текст главного меню - унифицированный со /start
+    Текст главного меню - современный дизайн 2025-2026
+    Минималистичный, чистый, с акцентом на ключевую информацию
     """
-    status_emoji = "🟢" if subscription_active else "⚪"
-    status_text = "Активна" if subscription_active else "Неактивна"
+    status_emoji = "✅" if subscription_active else "⏸️"
+    status_text = "Активна" if subscription_active else "Не активна"
+    
+    # Градиентная линия для разделения (визуальный тренд 2025)
+    separator = "━━━━━━━━━━━━━━━━━━━━"
     
     return f"""
-<b>🏠 Главное меню</b>
+<b>🧭 Главное меню</b>
 
-Привет, <b>{first_name}</b>! 👋
+<blockquote>Привет, {first_name}! Добро пожаловать в YoVPN 👋</blockquote>
 
-╭─────────────────╮
-│  💰 Баланс: <code>{balance:.2f}₽</code>
-│  📅 Доступ: <code>{subscription_days} дн.</code>
-│  {status_emoji} Статус: <code>{status_text}</code>
-╰─────────────────╯
+{separator}
 
-<i>Выбери нужный раздел</i> 👇
+💰 <b>Баланс:</b> <code>{balance:.2f}₽</code>
+📅 <b>Доступ:</b> <code>{subscription_days} дн.</code>
+{status_emoji} <b>Статус:</b> <code>{status_text}</code>
+
+{separator}
+
+<i>💡 Выберите действие из меню ниже</i>
 """.strip()
 
 
