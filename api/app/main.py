@@ -7,11 +7,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Create FastAPI app with optimized settings
 app = FastAPI(
     title=settings.app_name,
     description="API for YoVPN WebApp - Telegram Mini App for v2raytun activation",
     version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 
@@ -20,6 +22,14 @@ async def startup_event():
     """Initialize services on startup"""
     logger.info("🚀 Starting YoVPN WebApp API...")
     logger.info(f"📡 Marzban API URL: {settings.marzban_api_url}")
+    
+    # Initialize cache
+    try:
+        from app.utils.cache import cache
+        await cache.connect()
+        logger.info("✅ Redis cache initialized")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to initialize cache: {e}")
     
     # Import and check marzban service
     try:
@@ -45,6 +55,15 @@ async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("👋 Shutting down YoVPN WebApp API...")
     
+    # Close cache connection
+    try:
+        from app.utils.cache import cache
+        await cache.close()
+        logger.info("✅ Redis cache closed")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to close cache: {e}")
+    
+    # Close marzban service
     try:
         from app.services.subscription_service import subscription_service
         
@@ -64,7 +83,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(api.router)
+app.include_router(api.router, prefix="/api")
 
 
 @app.get("/")

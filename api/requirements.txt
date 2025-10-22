@@ -1,27 +1,38 @@
-# FastAPI and dependencies
+# YoVPN API - Optimized Production Dependencies
+# FastAPI backend with Marzban integration
+
+# FastAPI Framework
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-
-# CORS and security
 python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
 
-# HTTP requests
-httpx==0.26.0
+# HTTP Client
+httpx==0.25.2
 aiohttp==3.9.1
 
-# Database (если нужно)
-sqlalchemy==2.0.25
-databases==0.9.0
+# Data Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
 
-# Redis для кэширования
+# Database & Caching
 redis==5.0.1
-aioredis==2.0.1
+asyncio==3.4.3
 
-# Logging
-python-json-logger==2.0.7
-
-# Environment variables
+# Configuration
+python-decouple==3.8
 python-dotenv==1.0.0
+
+# Security
+cryptography==43.0.3
+python-jose[cryptography]==3.3.0
+
+# Monitoring & Logging
+sentry-sdk[fastapi]==1.38.0
+structlog==23.2.0
+
+# Performance
+uvloop==0.19.0
+orjson==3.9.10
+
+# Utilities
+python-dateutil==2.8.2
