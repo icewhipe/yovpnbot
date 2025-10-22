@@ -55,8 +55,8 @@ const nextConfig = {
     formats: ['image/webp'],
   },
   
-  // Asset prefix for production CDN support
-  assetPrefix: process.env.NODE_ENV === 'production' ? process.env.NEXT_PUBLIC_BASE_URL : '',
+  // Asset prefix disabled for Railway (causes issues with relative paths)
+  // assetPrefix: process.env.NODE_ENV === 'production' ? process.env.NEXT_PUBLIC_BASE_URL : '',
   
   // Reduce bundle size
   webpack: (config, { isServer }) => {
