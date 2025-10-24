@@ -1,91 +1,85 @@
-# Git
-.git
-.gitignore
-.gitattributes
-
 # Python
-__pycache__
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-*.egg-info/
-dist/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
 *.egg
-.pytest_cache/
-.coverage
-htmlcov/
-.mypy_cache/
-.ruff_cache/
+MANIFEST
 
-# Virtual environments
+# Virtual Environment
 venv/
-env/
 ENV/
+env/
 .venv
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# OS
 .DS_Store
-
-# Documentation
-*.md
-!README.md
-docs/
-CHANGELOG.md
-CONTRIBUTING.md
-LICENSE
-
-# Tests
-tests/
-*.test.py
-
-# Development files
-requirements-dev.txt
-.env.example
-.env.local
-.env.development
+Thumbs.db
 
 # Logs
-*.log
 logs/
+*.log
 
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Environment
+.env
+.env.local
+.env.*.local
 
-# Database files (will be created at runtime)
+# Database
 *.db
 *.sqlite
 *.sqlite3
 
-# Node modules (if any)
-node_modules/
+# Git
+.git/
+.gitignore
+.gitattributes
 
-# Railway specific
-.railway/
-railway.toml
-railway.json
+# Documentation
+*.md
+docs/
 
-# CI/CD
-.github/
-.gitlab-ci.yml
-.travis.yml
-
-# Monitoring configs (will be mounted)
-monitoring/
-
-# Nginx configs (separate service)
-nginx/
-nginx.conf
+# Tests
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
 
 # Docker
 Dockerfile*
 docker-compose*.yml
 .dockerignore
+
+# Node (for webapp)
+node_modules/
+webapp/node_modules/
+webapp/.next/
+webapp/out/
+
+# Temporary files
+tmp/
+temp/
+*.tmp

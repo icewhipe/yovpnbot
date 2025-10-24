@@ -1,109 +1,146 @@
-# YoVPN Bot Docker Compose
-# Полная настройка для продакшена
-
 version: '3.8'
 
 services:
-  # Основной бот
-  bot:
-    build: .
-    container_name: yovpn-bot
-    env_file: .env
-    ports:
-      - "8000:8000"  # Prometheus метрики
-      - "8080:8080"  # Health check
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
-    depends_on:
-      - redis
+  # ========================================
+  # MySQL Database
+  # ========================================
+  mysql:
+    image: mysql:8.0
+    container_name: yovpn_mysql
     restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-changeme}
+      MYSQL_DATABASE: yovpn
+      MYSQL_USER: yovpn
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-yovpn_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - yovpn-network
+      - yovpn_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Redis для кэширования
+  # ========================================
+  # Redis Cache
+  # ========================================
   redis:
     image: redis:7-alpine
-    container_name: yovpn-redis
+    container_name: yovpn_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    restart: unless-stopped
     networks:
-      - yovpn-network
-    command: redis-server --appendonly yes
+      - yovpn_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
-  # Prometheus для мониторинга
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: yovpn-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
+  # ========================================
+  # Telegram Bot
+  # ========================================
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yovpn_bot
     restart: unless-stopped
-    networks:
-      - yovpn-network
-
-  # Grafana для визуализации
-  grafana:
-    image: grafana/grafana:latest
-    container_name: yovpn-grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    command: python -u bot/main.py
+    env_file:
+      - .env
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    restart: unless-stopped
-    networks:
-      - yovpn-network
+      DATABASE_URL: mysql+aiomysql://yovpn:${MYSQL_PASSWORD:-yovpn_password}@mysql:3306/yovpn
+      REDIS_URL: redis://redis:6379/0
     depends_on:
-      - prometheus
-
-  # Nginx для reverse proxy
-  nginx:
-    image: nginx:alpine
-    container_name: yovpn-nginx
-    ports:
-      - "80:80"
-      - "443:443"
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - yovpn_network
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - bot
-    restart: unless-stopped
-    networks:
-      - yovpn-network
+      - ./logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ========================================
+  # Admin Panel
+  # ========================================
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yovpn_admin
+    restart: unless-stopped
+    command: uvicorn admin.main:app --host 0.0.0.0 --port 8080
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: mysql+aiomysql://yovpn:${MYSQL_PASSWORD:-yovpn_password}@mysql:3306/yovpn
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${ADMIN_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - yovpn_network
+    volumes:
+      - ./logs:/app/logs
+      - ./admin/static:/app/admin/static
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ========================================
+  # Database Migrations (run once)
+  # ========================================
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: yovpn_migrations
+    command: alembic upgrade head
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: mysql+aiomysql://yovpn:${MYSQL_PASSWORD:-yovpn_password}@mysql:3306/yovpn
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - yovpn_network
+    profiles:
+      - migrations
+
+# ========================================
+# Volumes
+# ========================================
 volumes:
+  mysql_data:
+    driver: local
   redis_data:
     driver: local
-  prometheus_data:
-    driver: local
-  grafana_data:
-    driver: local
 
+# ========================================
+# Networks
+# ========================================
 networks:
-  yovpn-network:
+  yovpn_network:
     driver: bridge
