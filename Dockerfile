@@ -1,57 +1,60 @@
+# ========================================
 # YoVPN Bot Dockerfile
-# Современный многоэтапный Dockerfile для продакшена
+# Мультистейдж сборка для оптимизации размера
+# ========================================
 
-# Этап 1: Базовый образ
 FROM python:3.11-slim as base
 
 # Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    libffi-dev \
-    libssl-dev \
+    default-libmysqlclient-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
-
-# Создаем пользователя для безопасности
-RUN groupadd -r yovpn && useradd -r -g yovpn yovpn
 
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем файлы зависимостей
-COPY requirements-prod.txt .
+# Копируем requirements
+COPY requirements.txt .
 
-# Устанавливаем Python зависимости (только production)
-RUN pip install --no-cache-dir -r requirements-prod.txt
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Этап 2: Сборка приложения
-FROM base as builder
+# ========================================
+# Production Stage
+# ========================================
+FROM python:3.11-slim
 
-# Копируем исходный код
-COPY . .
+# Устанавливаем только runtime зависимости
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Создаем директории для данных
-RUN mkdir -p data uploads temp logs
+# Создаем непривилегированного пользователя
+RUN useradd -m -u 1000 yovpn
 
-# Устанавливаем права доступа
-RUN chown -R yovpn:yovpn /app
+WORKDIR /app
 
-# Этап 3: Финальный образ
-FROM base as production
+# Копируем установленные пакеты из base stage
+COPY --from=base /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=base /usr/local/bin /usr/local/bin
 
-# Копируем приложение из builder
-COPY --from=builder /app /app
+# Копируем код приложения
+COPY --chown=yovpn:yovpn . .
 
-# Переключаемся на пользователя yovpn
+# Создаем необходимые директории
+RUN mkdir -p logs static/images && \
+    chown -R yovpn:yovpn /app
+
+# Переключаемся на непривилегированного пользователя
 USER yovpn
 
-# Открываем порты
-EXPOSE 8000 8080
+# Здоровье контейнера
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
 
-# Устанавливаем переменные окружения
-ENV PYTHONPATH=/app
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# Запускаем приложение
-CMD ["python", "bot/main.py"]
+# Точка входа определяется в docker-compose.yml
+CMD ["python", "-u", "bot/main.py"]
