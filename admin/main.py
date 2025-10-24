@@ -113,6 +113,14 @@ app.include_router(subscription_routes.router, prefix="/admin/subscriptions", ta
 app.include_router(broadcast_routes.router, prefix="/admin/broadcast", tags=["broadcast"])
 app.include_router(settings_routes.router, prefix="/admin/settings", tags=["settings"])
 
+# Новые роуты
+from .routes import statistics_routes, balance_routes, marzban_routes, security_routes
+
+app.include_router(statistics_routes.router, prefix="/admin/statistics", tags=["statistics"])
+app.include_router(balance_routes.router, prefix="/admin/balance", tags=["balance"])
+app.include_router(marzban_routes.router, prefix="/admin/marzban", tags=["marzban"])
+app.include_router(security_routes.router, prefix="/admin/security", tags=["security"])
+
 
 if __name__ == "__main__":
     import uvicorn

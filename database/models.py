@@ -58,10 +58,18 @@ class User(Base):
     language = Column(String(10), default="ru", nullable=False, comment="Язык интерфейса")
     referred_by = Column(Integer, ForeignKey("users.id"), nullable=True, comment="Кто пригласил пользователя")
     referral_count = Column(Integer, default=0, nullable=False, comment="Количество рефералов")
+    referral_level = Column(Integer, default=0, nullable=False, comment="Уровень в реферальной иерархии")
+    referral_earnings = Column(Float, default=0.0, nullable=False, comment="Заработок с рефералов")
+    
+    # Проверка подписки на канал
+    channel_subscribed = Column(Boolean, default=False, nullable=False, comment="Подписан ли на канал @yodevelop")
+    channel_check_at = Column(DateTime(timezone=True), nullable=True, comment="Последняя проверка подписки")
     
     # Флаги
     bonus_given = Column(Boolean, default=False, nullable=False, comment="Выдан ли приветственный бонус")
     first_start_completed = Column(Boolean, default=False, nullable=False, comment="Завершена ли первая настройка")
+    activation_step = Column(Integer, default=0, nullable=False, comment="Шаг активации (0-3)")
+    selected_platform = Column(String(50), nullable=True, comment="Выбранная платформа (iOS/Android/etc)")
     
     # Временные метки
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, comment="Дата регистрации")
